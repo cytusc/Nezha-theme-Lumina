@@ -4,7 +4,7 @@ import type { PingOverviewBucket } from "@/types/monitor";
 interface MiniBarsProps {
   /** Raw latency values (ms) ordered oldest→newest. Values ≤0 are treated as lost and dimmed. */
   values: number[];
-  /** Denominator for 0..1 normalization (use the max across the window). */
+  /** Fallback denominator for 0..1 normalization. */
   max: number;
   /** Color tier threshold based on this value (fallback path only). */
   lastValue?: number;
@@ -12,6 +12,17 @@ interface MiniBarsProps {
   count?: number;
   buckets?: PingOverviewBucket[];
   onHoverIndex?: (index: number | null) => void;
+}
+
+function percentile(values: number[], ratio: number) {
+  if (values.length === 0) return null;
+  const sorted = [...values].sort((a, b) => a - b);
+  const index = (sorted.length - 1) * ratio;
+  const lower = Math.floor(index);
+  const upper = Math.ceil(index);
+  if (lower === upper) return sorted[lower] ?? null;
+  const weight = index - lower;
+  return (sorted[lower] ?? 0) + ((sorted[upper] ?? 0) - (sorted[lower] ?? 0)) * weight;
 }
 
 /** Pixel-matched latency histogram (24 bars, 8px tall, 1px gap). */
@@ -94,6 +105,16 @@ export function MiniBars({
           }
           return nextBars;
         })();
+  const positiveValues = bars
+    .map((bar) => bar.value)
+    .filter((value): value is number => Number.isFinite(value) && value > 0);
+  const p95Cap = percentile(positiveValues, 0.95);
+  const normalizedMax =
+    p95Cap && Number.isFinite(p95Cap) && p95Cap > 0
+      ? p95Cap
+      : max > 0
+        ? max
+        : 1;
 
   return (
     <div
@@ -104,7 +125,7 @@ export function MiniBars({
       {bars.map(({ value, bucket, hasSamples, tone }, i) => {
         const v = value;
         const has = v > 0;
-        const h = has ? Math.max(0.2, Math.min(1, v / max)) : 0.25;
+        const h = has ? Math.max(0.2, Math.min(1, v / normalizedMax)) : 0.25;
         return (
           <span
             key={i}
