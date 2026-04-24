@@ -12,6 +12,7 @@ interface State {
   byUuid: Record<string, NodeDisplay>;
   trafficTrends: Record<string, NodeTrafficTrend>;
   order: string[];
+  initialized: boolean;
   lastSuccessAt: number;
   failureStreak: number;
 }
@@ -67,6 +68,7 @@ function emptyState(): State {
     byUuid: {},
     trafficTrends: {},
     order: [],
+    initialized: false,
     lastSuccessAt: 0,
     failureStreak: 0,
   };
@@ -341,6 +343,7 @@ function applyStreamSnapshot(payload: ReturnType<typeof parseServerStreamPayload
       byUuid: nextByUuid,
       trafficTrends: nextTrafficTrends,
       order: nextOrder,
+      initialized: true,
       lastSuccessAt: Date.now(),
       failureStreak: 0,
     },
@@ -430,6 +433,13 @@ export function ensureStarted() {
   if (started) return;
   started = true;
   openSocket();
+}
+
+export function hydrateServerSnapshot(
+  payload: ReturnType<typeof parseServerStreamPayload>,
+) {
+  if (state.initialized && state.lastSuccessAt > 0) return;
+  applyStreamSnapshot(payload);
 }
 
 export function subscribe(listener: Listener): () => void {

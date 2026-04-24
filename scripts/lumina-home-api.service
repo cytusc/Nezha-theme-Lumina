@@ -1,0 +1,23 @@
+[Unit]
+Description=Lumina Home API Aggregator
+After=network.target nezha-dashboard.service
+Wants=nezha-dashboard.service
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/opt/lumina
+ExecStart=/usr/bin/python3 /opt/lumina/lumina_home_api.py
+Restart=always
+RestartSec=2
+Environment=PYTHONUNBUFFERED=1
+Environment=LUMINA_HOME_API_HOST=127.0.0.1
+Environment=LUMINA_HOME_API_PORT=18080
+Environment=NEZHA_HTTP_BASE=http://127.0.0.1:8008
+Environment=NEZHA_WS_URL=ws://127.0.0.1:8008/api/v1/ws/server
+Environment=LUMINA_PING_CACHE_TTL=25
+Environment=LUMINA_LOAD_CACHE_TTL=20
+Environment=LUMINA_PING_FETCH_WORKERS=6
+
+[Install]
+WantedBy=multi-user.target

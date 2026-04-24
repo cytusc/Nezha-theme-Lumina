@@ -1,12 +1,13 @@
 import { z } from "zod";
-import type {
-  LoadRecordsResponse,
-  Me,
-  NodeDisplay,
-  PingOverviewItem,
-  PingRecordsResponse,
-  PingTask,
-  Version,
+import {
+  LoadRecordSchema,
+  type LoadRecordsResponse,
+  type Me,
+  type NodeDisplay,
+  type PingOverviewItem,
+  type PingRecordsResponse,
+  type PingTask,
+  type Version,
 } from "@/types/monitor";
 
 const ApiEnvelope = <T extends z.ZodTypeAny>(inner: T) =>
@@ -74,6 +75,43 @@ const NezhaWsPayloadSchema = z
   })
   .passthrough();
 
+const PingOverviewItemSchema = z
+  .object({
+    client: z.string().default(""),
+    isAssigned: z.boolean().default(false),
+    lastValue: z.number().nullable().default(null),
+    values: z.array(z.number()).default([]),
+    samples: z
+      .array(
+        z
+          .object({
+            time: z.number().default(0),
+            value: z.number().default(0),
+          })
+          .passthrough(),
+      )
+      .default([]),
+    max: z.number().default(1),
+    loss: z.number().nullable().default(null),
+  })
+  .passthrough();
+
+const PingOverviewMapSchema = z.record(PingOverviewItemSchema).default({});
+
+const HomeBootstrapSchema = z
+  .object({
+    snapshot: NezhaWsPayloadSchema,
+    ping_overviews: PingOverviewMapSchema,
+  })
+  .passthrough();
+
+const LoadRecordsResponseSchema = z
+  .object({
+    count: z.number().default(0),
+    records: z.array(LoadRecordSchema).default([]),
+  })
+  .passthrough();
+
 const NezhaMetricPointSchema = z
   .object({
     ts: z.number(),
@@ -132,6 +170,7 @@ const NezhaProfileSchema = z
   .passthrough();
 
 export type NezhaStreamServer = z.infer<typeof NezhaStreamServerSchema>;
+export type HomeBootstrapPayload = z.infer<typeof HomeBootstrapSchema>;
 
 type CachedNodeBase = {
   serverId: number;
@@ -518,6 +557,24 @@ export function getServerStreamUrl() {
   return `${protocol}//${window.location.host}/api/v1/ws/server`;
 }
 
+export async function getHomeBootstrap(): Promise<HomeBootstrapPayload> {
+  return await apiGet("/lumina-api/home-bootstrap", HomeBootstrapSchema);
+}
+
+export async function getHomepagePingOverviewBatch(
+  uuids: string[],
+): Promise<Record<string, PingOverviewItem>> {
+  const normalized = Array.from(new Set(uuids.map((uuid) => uuid.trim()).filter(Boolean))).sort(
+    (left, right) => left.localeCompare(right, undefined, { numeric: true }),
+  );
+
+  if (normalized.length === 0) return {};
+
+  const search = new URLSearchParams();
+  search.set("uuids", normalized.join(","));
+  return await apiGet(`/lumina-api/ping-overview?${search.toString()}`, PingOverviewMapSchema);
+}
+
 export async function getMe(): Promise<Me> {
   try {
     const profile = await apiGet("/api/v1/profile", NezhaProfileSchema);
@@ -544,6 +601,16 @@ async function getMetricSeries(serverId: number, metric: string, period: string)
     `/api/v1/server/${serverId}/metrics?metric=${metric}&period=${period}`,
     NezhaServerMetricsSchema,
   );
+}
+
+async function getAggregatedLoadRecords(
+  uuid: string,
+  hours: number,
+): Promise<LoadRecordsResponse> {
+  const search = new URLSearchParams();
+  search.set("uuid", uuid);
+  search.set("hours", String(hours));
+  return await apiGet(`/lumina-api/load-records?${search.toString()}`, LoadRecordsResponseSchema);
 }
 
 function assignLoadMetricValue(
@@ -595,6 +662,12 @@ export async function getLoadRecords(
   uuid: string,
   hours = GUEST_HISTORY_HOURS,
 ): Promise<LoadRecordsResponse> {
+  try {
+    return await getAggregatedLoadRecords(uuid, hours);
+  } catch {
+    // sidecar 聚合不可用时回退到原有多 metrics 拼装，避免详情页直接失效。
+  }
+
   const serverId = Number.parseInt(uuid, 10);
   if (!Number.isFinite(serverId) || serverId <= 0) {
     return { count: 0, records: [] };

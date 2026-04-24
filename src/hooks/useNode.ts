@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useSyncExternalStore } from "react";
+import { ensureHomeBootstrap } from "@/services/homeBootstrap";
 import {
   ensureStarted,
   getNodeSnapshot,
@@ -17,7 +18,9 @@ const EMPTY_TRAFFIC_TREND_SNAPSHOT: { up: TrafficTrendSample[]; down: TrafficTre
 
 function useEnsured(enabled = true) {
   useEffect(() => {
-    if (enabled) ensureStarted();
+    if (!enabled) return;
+    void ensureHomeBootstrap();
+    ensureStarted();
   }, [enabled]);
 }
 
@@ -56,9 +59,10 @@ export function useNodeStoreStatus() {
   const snap = useSyncExternalStore(subscribe, getSnapshot, getSnapshot);
   return useMemo(
     () => ({
+      initialized: snap.initialized,
       lastSuccessAt: snap.lastSuccessAt,
       failureStreak: snap.failureStreak,
     }),
-    [snap.failureStreak, snap.lastSuccessAt],
+    [snap.failureStreak, snap.initialized, snap.lastSuccessAt],
   );
 }
