@@ -238,6 +238,23 @@ function extractExpireInfo(publicNote: string) {
   };
 }
 
+function extractCpuCoreCount(cpuModels: string[]) {
+  for (const model of cpuModels) {
+    const match =
+      model.match(/(\d+)\s+(?:Virtual|Physical)\s+Core/i) ??
+      model.match(/(\d+)\s+Cores?/i);
+
+    if (!match) continue;
+
+    const value = Number.parseInt(match[1], 10);
+    if (Number.isFinite(value) && value > 0) {
+      return value;
+    }
+  }
+
+  return cpuModels.length;
+}
+
 function toTimestamp(value: string | number | null | undefined) {
   if (typeof value === "number") {
     return value > 1_000_000_000_000 ? value : value * 1000;
@@ -368,7 +385,7 @@ export function mapStreamServerToNodeDisplay(
     region: server.country_code || "",
     hidden: false,
     cpu_name: host.cpu[0] || "",
-    cpu_cores: host.cpu.length,
+    cpu_cores: extractCpuCoreCount(host.cpu),
     arch: host.arch || "",
     virtualization: host.virtualization || "",
     os: formatOperatingSystem(host),
