@@ -1,4 +1,4 @@
-import { memo, useState, type ReactNode } from "react";
+import { memo, useRef, useState, type FocusEvent, type ReactNode } from "react";
 import { Link } from "react-router-dom";
 import {
   Cpu,
@@ -36,6 +36,7 @@ import { QualityBars } from "./QualityBars";
 import { clsx } from "clsx";
 import type { PingOverviewBucket, TrafficTrendSample } from "@/types/monitor";
 import type { TrafficRateDisplay } from "@/utils/format";
+import { useElementVisibility } from "@/hooks/useElementVisibility";
 
 function buildSubtitle(parts: Array<string | null | undefined>) {
   return parts
@@ -80,9 +81,13 @@ export const NodeCard = memo(function NodeCard({
 }: {
   uuid: string;
 }) {
+  const cardRef = useRef<HTMLElement | null>(null);
+  const inViewport = useElementVisibility(cardRef);
+  const [interacting, setInteracting] = useState(false);
   const node = useNode(uuid);
-  const trafficTrend = useNodeTrafficTrend(uuid);
-  const ping = usePingMini(uuid);
+  const detailsActive = inViewport || interacting;
+  const trafficTrend = useNodeTrafficTrend(uuid, detailsActive);
+  const ping = usePingMini(uuid, detailsActive);
   const pingBuckets = usePingMiniBuckets(ping);
   const [hoveredLatencyIndex, setHoveredLatencyIndex] = useState<number | null>(null);
   const [hoveredLossIndex, setHoveredLossIndex] = useState<number | null>(null);
@@ -128,7 +133,19 @@ export const NodeCard = memo(function NodeCard({
   const hasHomepagePingBinding = ping.isAssigned;
 
   return (
-    <article className={clsx("server-card", !node.online && "is-offline")}>
+    <article
+      ref={cardRef}
+      className={clsx("server-card", !node.online && "is-offline")}
+      onMouseEnter={() => setInteracting(true)}
+      onMouseLeave={() => setInteracting(false)}
+      onFocusCapture={() => setInteracting(true)}
+      onBlurCapture={(event: FocusEvent<HTMLElement>) => {
+        const nextTarget = event.relatedTarget;
+        if (!(nextTarget instanceof Node) || !event.currentTarget.contains(nextTarget)) {
+          setInteracting(false);
+        }
+      }}
+    >
       {!node.online && (
         <div className="offline-mask">
           <span className="offline-badge">
@@ -218,20 +235,22 @@ export const NodeCard = memo(function NodeCard({
               totalLabel="出站"
               rate={upRate}
               total={formatBytes(node.trafficUp)}
-              samples={trafficTrend.up}
+              samples={detailsActive ? trafficTrend.up : []}
               live={node.online}
               color="var(--progress-cpu)"
               icon={<ArrowUp size={15} strokeWidth={2.4} />}
+              enhanced={detailsActive}
             />
             <TrafficStat
               direction="下行"
               totalLabel="入站"
               rate={downRate}
               total={formatBytes(node.trafficDown)}
-              samples={trafficTrend.down}
+              samples={detailsActive ? trafficTrend.down : []}
               live={node.online}
               color="var(--status-success)"
               icon={<ArrowDown size={15} strokeWidth={2.4} />}
+              enhanced={detailsActive}
             />
           </div>
 
@@ -259,7 +278,7 @@ export const NodeCard = memo(function NodeCard({
                 </span>
               </div>
               <div className="server-health-chart-wrap">
-                {hasHomepagePingBinding ? (
+                {detailsActive && hasHomepagePingBinding ? (
                   <MiniBars
                     values={ping.values}
                     max={ping.max}
@@ -268,9 +287,11 @@ export const NodeCard = memo(function NodeCard({
                     onHoverIndex={setHoveredLatencyIndex}
                   />
                 ) : (
-                  <div className="server-health-placeholder">未配置首页 Ping</div>
+                  <div className="server-health-placeholder">
+                    {hasHomepagePingBinding ? "进入视口后加载延迟小图" : "未配置首页 Ping"}
+                  </div>
                 )}
-                {latencyHoverTime && hoveredLatencyBucket && (
+                {detailsActive && latencyHoverTime && hoveredLatencyBucket && (
                   <div className="server-health-tooltip">
                     <div className="instance-chart-tooltip-time">{latencyHoverTime}</div>
                     <div className="instance-chart-tooltip-row">
@@ -305,16 +326,18 @@ export const NodeCard = memo(function NodeCard({
                 </span>
               </div>
               <div className="server-health-chart-wrap">
-                {hasHomepagePingBinding ? (
+                {detailsActive && hasHomepagePingBinding ? (
                   <QualityBars
                     value={ping.loss}
                     buckets={pingBuckets}
                     onHoverIndex={setHoveredLossIndex}
                   />
                 ) : (
-                  <div className="server-health-placeholder">未配置首页 Ping</div>
+                  <div className="server-health-placeholder">
+                    {hasHomepagePingBinding ? "进入视口后加载丢包小图" : "未配置首页 Ping"}
+                  </div>
                 )}
-                {lossHoverTime && hoveredLossBucket && (
+                {detailsActive && lossHoverTime && hoveredLossBucket && (
                   <div className="server-health-tooltip">
                     <div className="instance-chart-tooltip-time">{lossHoverTime}</div>
                     <div className="instance-chart-tooltip-row">
@@ -382,6 +405,7 @@ function TrafficStat({
   live,
   color,
   icon,
+  enhanced,
 }: {
   direction: "下行" | "上行";
   totalLabel: "入站" | "出站";
@@ -391,6 +415,7 @@ function TrafficStat({
   live: boolean;
   color: string;
   icon: ReactNode;
+  enhanced: boolean;
 }) {
   return (
     <div className="traffic-stat">
@@ -405,7 +430,23 @@ function TrafficStat({
         </span>
       </div>
       <div className="traffic-stat-trend" aria-hidden>
-        <TrafficDotStrip samples={samples} color={color} />
+        {enhanced ? (
+          <TrafficDotStrip samples={samples} color={color} />
+        ) : (
+          <div className="traffic-dot-strip" style={{ gridTemplateColumns: "repeat(18, minmax(0, 1fr))" }}>
+            {Array.from({ length: 18 }, (_, index) => (
+              <span
+                key={index}
+                className="traffic-dot"
+                style={{
+                  background: "color-mix(in srgb, var(--progress-bg) 82%, transparent)",
+                  opacity: 0.42,
+                  transform: "scale(0.46)",
+                }}
+              />
+            ))}
+          </div>
+        )}
         <span className="traffic-stat-live" data-live={live ? "true" : "false"}>
           <span
             className="traffic-stat-live-dot"
@@ -450,7 +491,7 @@ function TrafficDotStrip({
 
         return (
           <span
-            key={`${index}-${sample.value}-${sample.level}`}
+            key={index}
             className="traffic-dot"
             style={{
               background: tone,

@@ -27,11 +27,11 @@ export function useHomepagePingOverview() {
   }, [visibleUuids]);
 }
 
-export function usePingMini(uuid: string): PingOverviewItem {
+export function usePingMini(uuid: string, enabled = true): PingOverviewItem {
   return useSyncExternalStore(
-    uuid ? (cb) => subscribeToPingItem(uuid, cb) : () => () => undefined,
-    uuid ? () => getPingSnapshot(uuid) : () => EMPTY_PING,
-    uuid ? () => getPingSnapshot(uuid) : () => EMPTY_PING,
+    uuid && enabled ? (cb) => subscribeToPingItem(uuid, cb) : () => () => undefined,
+    uuid && enabled ? () => getPingSnapshot(uuid) : () => EMPTY_PING,
+    uuid && enabled ? () => getPingSnapshot(uuid) : () => EMPTY_PING,
   );
 }
 
@@ -85,4 +85,3 @@ export function usePingMiniBuckets(
     });
   }, [count, ping.samples]);
 }
-

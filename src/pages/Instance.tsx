@@ -6,6 +6,7 @@ import { PingChart } from "@/components/instance/PingChart";
 import { LoadChart } from "@/components/instance/LoadChart";
 import { buildLoadTimeRangeOptions } from "@/components/instance/chartShared";
 import { useAuth } from "@/hooks/useAuth";
+import { prefetchLoadRecords, prefetchPingRecords } from "@/hooks/useRecords";
 
 const FIXED_PING_HOURS = 24;
 const GUEST_LOAD_HISTORY_HOURS = 24;
@@ -26,6 +27,29 @@ export function Instance() {
   );
 
   useEffect(() => {
+    if (!uuid) return;
+
+    const runPrefetch = () => {
+      void prefetchPingRecords(uuid, FIXED_PING_HOURS);
+    };
+
+    if (typeof window === "undefined") return;
+
+    const idleWindow = window as Window & {
+      requestIdleCallback?: (callback: () => void, options?: { timeout: number }) => number;
+      cancelIdleCallback?: (handle: number) => void;
+    };
+
+    if (typeof idleWindow.requestIdleCallback === "function") {
+      const handle = idleWindow.requestIdleCallback(runPrefetch, { timeout: 1200 });
+      return () => idleWindow.cancelIdleCallback?.(handle);
+    }
+
+    const timer = window.setTimeout(runPrefetch, 300);
+    return () => window.clearTimeout(timer);
+  }, [uuid]);
+
+  useEffect(() => {
     window.scrollTo(0, 0);
   }, [uuid]);
 
@@ -36,6 +60,14 @@ export function Instance() {
   }, [loadHours, loadRanges]);
 
   if (!uuid) return null;
+
+  const handlePrefetchPing = () => {
+    void prefetchPingRecords(uuid, FIXED_PING_HOURS);
+  };
+
+  const handlePrefetchLoad = (hours: number) => {
+    void prefetchLoadRecords(uuid, hours);
+  };
 
   return (
     <div className="flex flex-col gap-5 py-2">
@@ -49,6 +81,8 @@ export function Instance() {
           <button
             type="button"
             data-active={chartType === "load" ? "true" : "false"}
+            onMouseEnter={() => handlePrefetchLoad(loadHours)}
+            onFocus={() => handlePrefetchLoad(loadHours)}
             onClick={() => {
               startTransition(() => setChartType("load"));
             }}
@@ -58,6 +92,8 @@ export function Instance() {
           <button
             type="button"
             data-active={chartType === "ping" ? "true" : "false"}
+            onMouseEnter={handlePrefetchPing}
+            onFocus={handlePrefetchPing}
             onClick={() => {
               startTransition(() => setChartType("ping"));
             }}
@@ -72,6 +108,8 @@ export function Instance() {
                 key={range.value}
                 type="button"
                 data-active={loadHours === range.value ? "true" : "false"}
+                onMouseEnter={() => handlePrefetchLoad(range.value)}
+                onFocus={() => handlePrefetchLoad(range.value)}
                 onClick={() => {
                   startTransition(() => {
                     setLoadHours(range.value);
