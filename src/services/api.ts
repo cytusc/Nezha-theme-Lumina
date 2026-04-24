@@ -192,6 +192,52 @@ function formatOperatingSystem(host: z.infer<typeof NezhaHostSchema> | undefined
   return [host.platform, host.platform_version].filter(Boolean).join(" ");
 }
 
+function normalizeDateTextToIso(dateText: string) {
+  const normalized = dateText.trim().replace(/[./]/g, "-");
+  const match = normalized.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/);
+  if (!match) return "";
+
+  const [, year, month, day] = match;
+  const iso = `${year}-${month.padStart(2, "0")}-${day.padStart(2, "0")}`;
+  return Number.isNaN(Date.parse(iso)) ? "" : iso;
+}
+
+function extractExpireInfo(publicNote: string) {
+  const text = publicNote.trim();
+  if (!text) {
+    return { expiredAt: "", remark: "" };
+  }
+
+  const patterns = [
+    /(?:^|[\s,;|/【】\[\]（）()])(?:到期|过期时间|续费|exp|expire|expiry|expires?\s*at)\s*[:：=]?\s*(\d{4}[./-]\d{1,2}[./-]\d{1,2})(?:$|[\s,;|/【】\[\]（）()])/i,
+    /(?:^|[\s,;|/【】\[\]（）()])(\d{4}[./-]\d{1,2}[./-]\d{1,2})\s*(?:到期|过期|续费|exp|expire|expiry)(?:$|[\s,;|/【】\[\]（）()])/i,
+  ];
+
+  for (const pattern of patterns) {
+    const match = text.match(pattern);
+    const dateText = match?.[1];
+    if (!dateText) continue;
+
+    const expiredAt = normalizeDateTextToIso(dateText);
+    if (!expiredAt) continue;
+
+    const remark = text
+      .replace(match[0], " ")
+      .replace(/\s{2,}/g, " ")
+      .replace(/^[,;|/，。；、\s]+|[,;|/，。；、\s]+$/g, "");
+
+    return {
+      expiredAt,
+      remark,
+    };
+  }
+
+  return {
+    expiredAt: "",
+    remark: text,
+  };
+}
+
 function toTimestamp(value: string | number | null | undefined) {
   if (typeof value === "number") {
     return value > 1_000_000_000_000 ? value : value * 1000;
@@ -313,6 +359,7 @@ export function mapStreamServerToNodeDisplay(
   const host = server.host ?? NezhaHostSchema.parse({});
   const state = server.state ?? NezhaStateSchema.parse({});
   const lastActiveTs = toTimestamp(server.last_active);
+  const expireInfo = extractExpireInfo(server.public_note || "");
 
   return {
     uuid: String(server.id),
@@ -335,9 +382,9 @@ export function mapStreamServerToNodeDisplay(
     billing_cycle: "",
     auto_renewal: false,
     currency: "",
-    expired_at: "",
+    expired_at: expireInfo.expiredAt,
     tags: "",
-    public_remark: server.public_note || "",
+    public_remark: expireInfo.remark,
     traffic_limit: 0,
     traffic_limit_type: "",
     created_at: "",
