@@ -8,48 +8,17 @@ export interface TimeRangeOption {
 
 export const LOAD_TIME_RANGE_OPTIONS: TimeRangeOption[] = [
   { label: "实时", value: 0 },
-  { label: "1 小时", value: 1 },
-  { label: "4 小时", value: 4 },
   { label: "1 天", value: 24 },
   { label: "7 天", value: 168 },
   { label: "30 天", value: 720 },
 ];
 
-function formatRangeLabel(hours: number) {
-  if (hours % 24 === 0) {
-    const days = hours / 24;
-    return `${days} 天`;
-  }
-
-  return `${hours} 小时`;
-}
-
-function buildHistoryRangeOptions(
-  presets: TimeRangeOption[],
-  maxHours: number | null | undefined,
-  includeRealtime: boolean,
-) {
-  const options = includeRealtime ? [{ label: "实时", value: 0 }] : [];
-  if (!Number.isFinite(maxHours) || !maxHours || maxHours <= 0) {
-    return [...options, ...presets];
-  }
-
-  const safeMaxHours = Math.floor(maxHours);
-  const resolved = presets.filter((option) => option.value <= safeMaxHours);
-  const hasExactMatch = resolved.some((option) => option.value === safeMaxHours);
-
-  if (safeMaxHours > 0 && !hasExactMatch) {
-    resolved.push({
-      label: formatRangeLabel(safeMaxHours),
-      value: safeMaxHours,
-    });
-  }
-
-  return [...options, ...resolved];
-}
-
 export function buildLoadTimeRangeOptions(maxHours: number | null | undefined) {
-  return buildHistoryRangeOptions(LOAD_TIME_RANGE_OPTIONS, maxHours, true);
+  const safeMaxHours =
+    Number.isFinite(maxHours) && maxHours && maxHours > 0 ? Math.floor(maxHours) : 24;
+  return LOAD_TIME_RANGE_OPTIONS.filter(
+    (option) => option.value === 0 || option.value <= safeMaxHours,
+  );
 }
 
 const GRID_CHART_DEFAULT = { w: 420, h: 150 };

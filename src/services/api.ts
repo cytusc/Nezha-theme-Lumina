@@ -1,60 +1,174 @@
 import { z } from "zod";
-import { getRpc2Client } from "@/services/rpc2Client";
-import {
-  MeSchema,
-  NodeInfoSchema,
-  PublicConfigSchema,
-  AdminClientSchema,
-  VersionSchema,
-  LoadRecordSchema,
-  PingRecordSchema,
-  PingTaskSchema,
-  PingBasicInfoSchema,
-  type Me,
-  type NodeInfo,
-  type PublicConfig,
-  type AdminClient,
-  type Version,
-  type LoadRecordsResponse,
-  type PingRecordsResponse,
-  type PingTask,
-  type PingBasicInfo,
-} from "@/types/komari";
+import type {
+  LoadRecordsResponse,
+  Me,
+  NodeDisplay,
+  PingOverviewItem,
+  PingRecordsResponse,
+  PingTask,
+  Version,
+} from "@/types/monitor";
 
 const ApiEnvelope = <T extends z.ZodTypeAny>(inner: T) =>
-  z.object({
-    status: z.string().optional(),
-    message: z.string().optional(),
-    data: inner,
-  });
+  z
+    .object({
+      success: z.boolean().default(true),
+      data: inner.optional(),
+      error: z.string().optional(),
+    })
+    .passthrough();
 
-const RpcRecordsSchema = z
+const NezhaHostSchema = z
   .object({
-    count: z.number().default(0),
-    records: z.unknown().optional(),
-    tasks: z.unknown().optional(),
-    basic_info: z.unknown().optional(),
+    platform: z.string().default(""),
+    platform_version: z.string().default(""),
+    cpu: z.array(z.string()).default([]),
+    mem_total: z.number().default(0),
+    disk_total: z.number().default(0),
+    swap_total: z.number().default(0),
+    arch: z.string().default(""),
+    virtualization: z.string().default(""),
+    version: z.string().default(""),
+    gpu: z.array(z.string()).default([]),
   })
   .passthrough();
 
-const LOAD_RECORDS_PER_HOUR = 12;
-const PING_RECORDS_PER_HOUR = 240;
-const MAX_RPC_RECORDS = 20_000;
-const OVERVIEW_PING_MAX_COUNT = 4_000;
+const NezhaStateSchema = z
+  .object({
+    cpu: z.number().default(0),
+    mem_used: z.number().default(0),
+    swap_used: z.number().default(0),
+    disk_used: z.number().default(0),
+    net_in_transfer: z.number().default(0),
+    net_out_transfer: z.number().default(0),
+    net_in_speed: z.number().default(0),
+    net_out_speed: z.number().default(0),
+    uptime: z.number().default(0),
+    load_1: z.number().default(0),
+    load_5: z.number().default(0),
+    load_15: z.number().default(0),
+    tcp_conn_count: z.number().default(0),
+    udp_conn_count: z.number().default(0),
+    process_count: z.number().default(0),
+  })
+  .passthrough();
 
-interface RpcRecordsPayload {
-  count?: number;
-  records?: unknown;
-  tasks?: unknown;
-  basic_info?: unknown;
-}
+const NezhaStreamServerSchema = z
+  .object({
+    id: z.number(),
+    name: z.string().default(""),
+    public_note: z.string().default(""),
+    display_index: z.number().default(0),
+    host: NezhaHostSchema.nullish(),
+    state: NezhaStateSchema.nullish(),
+    country_code: z.string().default(""),
+    last_active: z.union([z.string(), z.number()]).nullish(),
+  })
+  .passthrough();
 
-export interface PingOverviewResponse {
-  count: number;
-  records: PingRecordsResponse["records"];
-  tasks: PingTask[];
-  basicInfo: PingBasicInfo[];
-}
+const NezhaWsPayloadSchema = z
+  .object({
+    now: z.number().default(0),
+    online: z.number().default(0),
+    servers: z.array(NezhaStreamServerSchema).default([]),
+  })
+  .passthrough();
+
+const NezhaMetricPointSchema = z
+  .object({
+    ts: z.number(),
+    value: z.number().default(0),
+  })
+  .passthrough();
+
+const NezhaServerMetricsSchema = z
+  .object({
+    server_id: z.number(),
+    server_name: z.string().default(""),
+    metric: z.string().default(""),
+    data_points: z.array(NezhaMetricPointSchema).default([]),
+  })
+  .passthrough();
+
+const NezhaServiceInfoSchema = z
+  .object({
+    monitor_id: z.number(),
+    server_id: z.number(),
+    monitor_name: z.string().default(""),
+    server_name: z.string().default(""),
+    display_index: z.number().default(0),
+    created_at: z.array(z.number()).default([]),
+    avg_delay: z.array(z.number()).default([]),
+  })
+  .passthrough();
+
+const NezhaSettingSchema = z
+  .object({
+    config: z
+      .object({
+        site_name: z.string().default(""),
+        custom_code: z.string().default(""),
+        custom_code_dashboard: z.string().default(""),
+        user_template: z.string().default(""),
+        oauth2_providers: z.array(z.string()).default([]),
+      })
+      .passthrough()
+      .default({}),
+    version: z.string().default(""),
+    frontend_templates: z.array(z.unknown()).default([]),
+    tsdb_enabled: z.boolean().default(false),
+  })
+  .passthrough();
+
+const NezhaProfileSchema = z
+  .object({
+    user: z
+      .object({
+        id: z.number().optional(),
+        username: z.string().default(""),
+      })
+      .passthrough(),
+  })
+  .passthrough();
+
+export type NezhaStreamServer = z.infer<typeof NezhaStreamServerSchema>;
+
+type CachedNodeBase = {
+  serverId: number;
+  ramTotal: number;
+  swapTotal: number;
+  diskTotal: number;
+};
+
+type CachedServiceEntry = {
+  expiresAt: number;
+  data: NezhaServiceInfo[];
+};
+
+type NezhaServiceInfo = z.infer<typeof NezhaServiceInfoSchema>;
+
+const nodeBaseCache = new Map<string, CachedNodeBase>();
+const serviceCache = new Map<string, CachedServiceEntry>();
+const SERVICE_CACHE_TTL_MS = 30_000;
+const GUEST_HISTORY_HOURS = 24;
+const ONLINE_GRACE_MS = 65_000;
+
+const LOAD_METRIC_MAP = {
+  cpu: "cpu",
+  memory: "ram",
+  swap: "swap",
+  disk: "disk",
+  net_in_speed: "net_in",
+  net_out_speed: "net_out",
+  net_in_transfer: "net_total_down",
+  net_out_transfer: "net_total_up",
+  load1: "load",
+  tcp_conn: "connections",
+  udp_conn: "connections_udp",
+  process_count: "process",
+} as const;
+
+type LoadMetricField = (typeof LOAD_METRIC_MAP)[keyof typeof LOAD_METRIC_MAP];
 
 export class ApiRequestError extends Error {
   constructor(
@@ -67,295 +181,428 @@ export class ApiRequestError extends Error {
   }
 }
 
-function normalizeRpcLatestStatus(
-  payload: unknown,
-): Record<string, unknown> {
-  const direct = z.record(z.string(), z.unknown()).safeParse(payload);
-  if (direct.success) {
-    return direct.data;
-  }
-
-  const wrapped = z
-    .object({
-      records: z.record(z.string(), z.unknown()).default({}),
-    })
-    .passthrough()
-    .safeParse(payload);
-  if (wrapped.success) {
-    return wrapped.data.records;
-  }
-
-  return {};
+function hoursToPeriod(hours: number) {
+  if (hours >= 720) return "30d";
+  if (hours >= 168) return "7d";
+  return "1d";
 }
 
-function getRecordsMaxCount(hours: number, recordsPerHour: number) {
-  const safeHours = Number.isFinite(hours) && hours > 0 ? hours : 1;
-  return Math.min(
-    MAX_RPC_RECORDS,
-    Math.max(recordsPerHour, Math.ceil(safeHours * recordsPerHour)),
-  );
+function formatOperatingSystem(host: z.infer<typeof NezhaHostSchema> | undefined) {
+  if (!host) return "";
+  return [host.platform, host.platform_version].filter(Boolean).join(" ");
 }
 
-async function apiGet<T>(path: string, schema: z.ZodType<T>): Promise<T> {
+function toTimestamp(value: string | number | null | undefined) {
+  if (typeof value === "number") {
+    return value > 1_000_000_000_000 ? value : value * 1000;
+  }
+  if (!value) return 0;
+  const numeric = Number(value);
+  if (Number.isFinite(numeric) && numeric > 0) {
+    return numeric > 1_000_000_000_000 ? numeric : numeric * 1000;
+  }
+  const parsed = Date.parse(value);
+  return Number.isNaN(parsed) ? 0 : parsed;
+}
+
+function isOnline(lastActive: string | number | null | undefined, nowMs: number) {
+  const last = toTimestamp(lastActive);
+  if (last <= 0) return false;
+  return nowMs - last <= ONLINE_GRACE_MS;
+}
+
+async function apiGet<TSchema extends z.ZodTypeAny>(
+  path: string,
+  schema: TSchema,
+): Promise<z.output<TSchema>> {
   const resp = await fetch(path, {
     credentials: "include",
     headers: { Accept: "application/json" },
   });
+
   if (!resp.ok) {
     throw new ApiRequestError(`Request ${path} failed: ${resp.status}`, resp.status, path);
   }
+
   const json = (await resp.json()) as unknown;
   const envelopeResult = ApiEnvelope(schema).safeParse(json);
-  if (envelopeResult.success) return envelopeResult.data.data as T;
+  if (envelopeResult.success) {
+    const envelope = envelopeResult.data;
+    if (envelope.success === false) {
+      throw new Error(envelope.error || `Request ${path} failed`);
+    }
+    if (envelope.data !== undefined) {
+      return envelope.data as z.output<TSchema>;
+    }
+  }
+
   const rawResult = schema.safeParse(json);
   if (rawResult.success) return rawResult.data;
+
   throw new Error(
-    `Schema mismatch on ${path}: ${envelopeResult.error.issues[0]?.message ?? ""}`,
+    `Schema mismatch on ${path}: ${envelopeResult.success ? "empty data" : envelopeResult.error.issues[0]?.message ?? "unknown"}`,
   );
 }
 
-async function rpcCall<T>(
-  method: string,
-  params: Record<string, unknown>,
-  schema: z.ZodType<T>,
-): Promise<T> {
-  const payload = await getRpc2Client().call(method, params);
-  const parsed = schema.safeParse(payload);
+async function getSettingPayload() {
+  return await apiGet("/api/v1/setting", NezhaSettingSchema);
+}
+
+async function getServerServices(serverId: number, period: string): Promise<NezhaServiceInfo[]> {
+  const cacheKey = `${serverId}:${period}`;
+  const cached = serviceCache.get(cacheKey);
+  const now = Date.now();
+  if (cached && cached.expiresAt > now) {
+    return cached.data;
+  }
+
+  const data = await apiGet(
+    `/api/v1/server/${serverId}/service?period=${period}`,
+    z.array(NezhaServiceInfoSchema),
+  );
+  serviceCache.set(cacheKey, {
+    expiresAt: now + SERVICE_CACHE_TTL_MS,
+    data,
+  });
+  return data;
+}
+
+function selectPrimaryService(services: NezhaServiceInfo[]) {
+  if (services.length === 0) return null;
+  return [...services].sort((left, right) => {
+    if (left.display_index !== right.display_index) {
+      return right.display_index - left.display_index;
+    }
+    return left.monitor_id - right.monitor_id;
+  })[0] ?? null;
+}
+
+function buildPingRecordsFromService(service: NezhaServiceInfo) {
+  const size = Math.min(service.created_at.length, service.avg_delay.length);
+  return Array.from({ length: size }, (_, index) => ({
+    task_id: service.monitor_id,
+    time: service.created_at[index] ?? 0,
+    value: service.avg_delay[index] ?? 0,
+    client: String(service.server_id),
+  }));
+}
+
+export function rememberNodeDisplay(node: NodeDisplay) {
+  const serverId = Number.parseInt(node.uuid, 10);
+  if (!Number.isFinite(serverId) || serverId <= 0) return;
+  nodeBaseCache.set(node.uuid, {
+    serverId,
+    ramTotal: node.ramTotal || node.mem_total,
+    swapTotal: node.swapTotal || node.swap_total,
+    diskTotal: node.diskTotal || node.disk_total,
+  });
+}
+
+export function parseServerStreamPayload(payload: unknown) {
+  const parsed = NezhaWsPayloadSchema.safeParse(payload);
   if (!parsed.success) {
-    throw new Error(
-      `Schema mismatch on rpc:${method}: ${parsed.error.issues[0]?.message ?? ""}`,
-    );
+    throw new Error(parsed.error.issues[0]?.message || "Invalid /api/v1/ws/server payload");
   }
   return parsed.data;
 }
 
-function normalizeRpcLoadRecords(
-  uuid: string,
-  payload: RpcRecordsPayload,
-): LoadRecordsResponse {
-  const rawRecords = Array.isArray(payload.records)
-    ? payload.records
-    : payload.records &&
-        typeof payload.records === "object" &&
-        Array.isArray((payload.records as Record<string, unknown>)[uuid])
-      ? (payload.records as Record<string, unknown>)[uuid]
-      : [];
-  const records = z.array(LoadRecordSchema).parse(rawRecords);
+export function mapStreamServerToNodeDisplay(
+  server: NezhaStreamServer,
+  nowMs = Date.now(),
+): NodeDisplay {
+  const host = server.host ?? NezhaHostSchema.parse({});
+  const state = server.state ?? NezhaStateSchema.parse({});
+  const lastActiveTs = toTimestamp(server.last_active);
+
   return {
-    count: payload.count || records.length,
-    records,
+    uuid: String(server.id),
+    name: server.name || `Server #${server.id}`,
+    group: "",
+    region: server.country_code || "",
+    hidden: false,
+    cpu_name: host.cpu[0] || "",
+    cpu_cores: host.cpu.length,
+    arch: host.arch || "",
+    virtualization: host.virtualization || "",
+    os: formatOperatingSystem(host),
+    kernel_version: host.version || "",
+    gpu_name: host.gpu[0] || "",
+    mem_total: host.mem_total || 0,
+    swap_total: host.swap_total || 0,
+    disk_total: host.disk_total || 0,
+    weight: -server.display_index,
+    price: 0,
+    billing_cycle: "",
+    auto_renewal: false,
+    currency: "",
+    expired_at: "",
+    tags: "",
+    public_remark: server.public_note || "",
+    traffic_limit: 0,
+    traffic_limit_type: "",
+    created_at: "",
+    updated_at: server.last_active == null ? "" : String(server.last_active),
+    online: isOnline(server.last_active, nowMs),
+    cpuPct: state.cpu || 0,
+    ramUsed: state.mem_used || 0,
+    ramTotal: host.mem_total || 0,
+    ramPct: host.mem_total > 0 ? ((state.mem_used || 0) / host.mem_total) * 100 : 0,
+    swapUsed: state.swap_used || 0,
+    swapTotal: host.swap_total || 0,
+    swapPct: host.swap_total > 0 ? ((state.swap_used || 0) / host.swap_total) * 100 : 0,
+    diskUsed: state.disk_used || 0,
+    diskTotal: host.disk_total || 0,
+    diskPct: host.disk_total > 0 ? ((state.disk_used || 0) / host.disk_total) * 100 : 0,
+    netUp: state.net_out_speed || 0,
+    netDown: state.net_in_speed || 0,
+    trafficUp: state.net_out_transfer || 0,
+    trafficDown: state.net_in_transfer || 0,
+    uptime: state.uptime || 0,
+    load1: state.load_1 || 0,
+    load5: state.load_5 || 0,
+    load15: state.load_15 || 0,
+    process: state.process_count || 0,
+    connectionsTcp: state.tcp_conn_count || 0,
+    connectionsUdp: state.udp_conn_count || 0,
+    updatedAt: lastActiveTs > 0 ? lastActiveTs : nowMs,
   };
 }
 
-function derivePingTasks(records: PingRecordsResponse["records"]): PingTask[] {
-  return Array.from(new Set(records.map((record) => record.task_id)))
-    .sort((a, b) => a - b)
-    .map((id) => ({
-      id,
-      interval: 60,
-      name: `任务 #${id}`,
-      loss: 0,
-      clients: [],
-      type: "icmp",
-      target: "",
-      weight: id,
-    }));
-}
-
-function normalizeRpcPingRecords(
-  payload: RpcRecordsPayload,
-): PingRecordsResponse {
-  const records = z.array(PingRecordSchema).parse(
-    Array.isArray(payload.records) ? payload.records : [],
-  );
-  const parsedTasks = z.array(PingTaskSchema).safeParse(payload.tasks);
-  const tasks = parsedTasks.success ? parsedTasks.data : derivePingTasks(records);
-  return {
-    count: payload.count || records.length,
-    records,
-    tasks,
-  };
-}
-
-function normalizeRpcPingOverview(
-  payload: RpcRecordsPayload,
-): PingOverviewResponse {
-  const records = z.array(PingRecordSchema).parse(
-    Array.isArray(payload.records) ? payload.records : [],
-  );
-  const parsedTasks = z.array(PingTaskSchema).safeParse(payload.tasks);
-  const basicInfo = z.array(PingBasicInfoSchema).safeParse(payload.basic_info);
-  return {
-    count: payload.count || records.length,
-    records,
-    tasks: parsedTasks.success ? parsedTasks.data : derivePingTasks(records),
-    basicInfo: basicInfo.success ? basicInfo.data : [],
-  };
+export function getServerStreamUrl() {
+  const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
+  return `${protocol}//${window.location.host}/api/v1/ws/server`;
 }
 
 export async function getMe(): Promise<Me> {
   try {
-    return (await apiGet("/api/me", MeSchema)) as Me;
+    const profile = await apiGet("/api/v1/profile", NezhaProfileSchema);
+    return {
+      logged_in: true,
+      username: profile.user.username || "",
+      uuid: profile.user.id != null ? String(profile.user.id) : profile.user.username || "",
+    };
   } catch {
     return { logged_in: false, username: "", uuid: "" };
   }
 }
 
-export async function getPublic(): Promise<PublicConfig> {
-  return (await apiGet("/api/public", PublicConfigSchema)) as PublicConfig;
-}
-
 export async function getVersion(): Promise<Version> {
-  return (await apiGet("/api/version", VersionSchema)) as Version;
+  const setting = await getSettingPayload();
+  return {
+    version: setting.version || "",
+    hash: "",
+  };
 }
 
-export async function getNodesLatestStatus(
-  uuids?: string[],
-): Promise<Record<string, unknown>> {
-  const payload = await rpcCall(
-    "common:getNodesLatestStatus",
-    uuids && uuids.length > 0 ? { uuids } : {},
-    z.unknown(),
+async function getMetricSeries(serverId: number, metric: string, period: string) {
+  return await apiGet(
+    `/api/v1/server/${serverId}/metrics?metric=${metric}&period=${period}`,
+    NezhaServerMetricsSchema,
   );
-  return normalizeRpcLatestStatus(payload);
 }
 
-export async function getNodes(): Promise<NodeInfo[]> {
-  return (await apiGet("/api/nodes", z.array(NodeInfoSchema))) as NodeInfo[];
-}
-
-export async function getAdminClients(): Promise<AdminClient[]> {
-  return (await apiGet("/api/admin/client/list", z.array(AdminClientSchema))) as AdminClient[];
+function assignLoadMetricValue(
+  target: LoadRecordsResponse["records"][number],
+  field: LoadMetricField,
+  value: number,
+) {
+  switch (field) {
+    case "cpu":
+      target.cpu = value;
+      break;
+    case "ram":
+      target.ram = value;
+      break;
+    case "swap":
+      target.swap = value;
+      break;
+    case "disk":
+      target.disk = value;
+      break;
+    case "net_in":
+      target.net_in = value;
+      break;
+    case "net_out":
+      target.net_out = value;
+      break;
+    case "net_total_down":
+      target.net_total_down = value;
+      break;
+    case "net_total_up":
+      target.net_total_up = value;
+      break;
+    case "load":
+      target.load = value;
+      break;
+    case "connections":
+      target.connections = value;
+      break;
+    case "connections_udp":
+      target.connections_udp = value;
+      break;
+    case "process":
+      target.process = value;
+      break;
+  }
 }
 
 export async function getLoadRecords(
   uuid: string,
-  hours = 6,
+  hours = GUEST_HISTORY_HOURS,
 ): Promise<LoadRecordsResponse> {
-  try {
-    const maxCount = getRecordsMaxCount(hours, LOAD_RECORDS_PER_HOUR);
-    const payload = await rpcCall(
-      "common:getRecords",
-      {
-        uuid,
-        hours,
-        type: "load",
-        maxCount,
-      },
-      RpcRecordsSchema,
-    );
-    return normalizeRpcLoadRecords(uuid, payload);
-  } catch {
-    return (await apiGet(
-      `/api/records/load?uuid=${encodeURIComponent(uuid)}&hours=${hours}`,
-      z.object({
-        count: z.number().default(0),
-        records: z.array(LoadRecordSchema).default([]),
-      }),
-    )) as LoadRecordsResponse;
+  const serverId = Number.parseInt(uuid, 10);
+  if (!Number.isFinite(serverId) || serverId <= 0) {
+    return { count: 0, records: [] };
   }
+
+  const period = hoursToPeriod(hours);
+  const totals = nodeBaseCache.get(uuid) ?? {
+    serverId,
+    ramTotal: 0,
+    swapTotal: 0,
+    diskTotal: 0,
+  };
+
+  const metricNames = Object.keys(LOAD_METRIC_MAP) as Array<keyof typeof LOAD_METRIC_MAP>;
+  const metricResults = await Promise.all(
+    metricNames.map(async (metric) => ({
+      metric,
+      payload: await getMetricSeries(serverId, metric, period),
+    })),
+  );
+
+  const pointMap = new Map<number, LoadRecordsResponse["records"][number]>();
+  const ensurePoint = (time: number) => {
+    const timestamp = time > 1_000_000_000_000 ? time : time * 1000;
+    const current = pointMap.get(timestamp);
+    if (current) return current;
+    const created = {
+      cpu: 0,
+      gpu: 0,
+      ram: 0,
+      ram_total: totals.ramTotal,
+      swap: 0,
+      swap_total: totals.swapTotal,
+      load: 0,
+      temp: 0,
+      disk: 0,
+      disk_total: totals.diskTotal,
+      net_in: 0,
+      net_out: 0,
+      net_total_up: 0,
+      net_total_down: 0,
+      process: 0,
+      connections: 0,
+      connections_udp: 0,
+      time: timestamp,
+      client: uuid,
+    };
+    pointMap.set(timestamp, created);
+    return created;
+  };
+
+  for (const { metric, payload } of metricResults) {
+    const field = LOAD_METRIC_MAP[metric];
+    for (const point of payload.data_points) {
+      const target = ensurePoint(point.ts);
+      assignLoadMetricValue(target, field, point.value);
+    }
+  }
+
+  const records = [...pointMap.values()].sort((left, right) => Number(left.time) - Number(right.time));
+  return {
+    count: records.length,
+    records,
+  };
 }
 
 export async function getPingRecords(
   uuid: string,
-  hours = 6,
+  hours = GUEST_HISTORY_HOURS,
 ): Promise<PingRecordsResponse> {
-  try {
-    const maxCount = getRecordsMaxCount(hours, PING_RECORDS_PER_HOUR);
-    const payload = await rpcCall(
-      "common:getRecords",
-      {
-        uuid,
-        hours,
-        type: "ping",
-        maxCount,
-      },
-      RpcRecordsSchema,
-    );
-    return normalizeRpcPingRecords(payload);
-  } catch {
-    return (await apiGet(
-      `/api/records/ping?uuid=${encodeURIComponent(uuid)}&hours=${hours}`,
-      z.object({
-        count: z.number().default(0),
-        records: z.array(PingRecordSchema).default([]),
-        tasks: z.array(PingTaskSchema).default([]),
-      }),
-    )) as PingRecordsResponse;
+  const serverId = Number.parseInt(uuid, 10);
+  if (!Number.isFinite(serverId) || serverId <= 0) {
+    return { count: 0, records: [], tasks: [] };
   }
-}
 
-export async function getPublicPingTasks(): Promise<PingTask[]> {
-  return (await apiGet("/api/task/ping", z.array(PingTaskSchema))) as PingTask[];
-}
+  const period = hoursToPeriod(hours);
+  const services = await getServerServices(serverId, period);
+  const intervalSeconds = period === "30d" ? 7200 : period === "7d" ? 1800 : 30;
 
-export async function getAdminPingTasks(): Promise<PingTask[]> {
-  return (await apiGet("/api/admin/ping", z.array(PingTaskSchema))) as PingTask[];
-}
-
-export async function saveThemeSettings(
-  theme: string,
-  settings: Record<string, unknown>,
-): Promise<void> {
-  const resp = await fetch(`/api/admin/theme/settings?theme=${encodeURIComponent(theme)}`, {
-    method: "POST",
-    credentials: "include",
-    headers: {
-      Accept: "application/json",
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify(settings),
-  });
-
-  if (!resp.ok) {
-    let message = `Request /api/admin/theme/settings failed: ${resp.status}`;
-    try {
-      const json = (await resp.json()) as { message?: string };
-      if (json?.message) {
-        message = json.message;
+  const tasks: PingTask[] = [...services]
+    .sort((left, right) => {
+      if (left.display_index !== right.display_index) {
+        return right.display_index - left.display_index;
       }
-    } catch {
-      // Keep the fallback error message when the body is not JSON.
-    }
-    throw new ApiRequestError(message, resp.status, "/api/admin/theme/settings");
-  }
+      return left.monitor_id - right.monitor_id;
+    })
+    .map((service) => ({
+      id: service.monitor_id,
+      interval: intervalSeconds,
+      name: service.monitor_name || `服务 #${service.monitor_id}`,
+      loss: null,
+      clients: [uuid],
+      type: "service",
+      target: service.server_name || uuid,
+      weight: service.display_index,
+    }));
+
+  const records = services.flatMap(buildPingRecordsFromService);
+  return {
+    count: records.length,
+    records,
+    tasks,
+  };
 }
 
-export async function getPingOverview(
-  hours = 1,
-  taskId?: number,
-): Promise<PingOverviewResponse> {
-  try {
-    const payload = await rpcCall(
-      "common:getRecords",
-      {
-        hours,
-        type: "ping",
-        ...(taskId ? { task_id: taskId } : {}),
-        maxCount: OVERVIEW_PING_MAX_COUNT,
-      },
-      RpcRecordsSchema,
-    );
-    return normalizeRpcPingOverview(payload);
-  } catch {
-    if (!taskId) {
-      throw new Error("Ping overview fallback requires a concrete task_id");
-    }
-
-    const data = await apiGet(
-      `/api/records/ping?task_id=${encodeURIComponent(taskId)}&hours=${hours}`,
-      z.object({
-        count: z.number().default(0),
-        records: z.array(PingRecordSchema).default([]),
-        tasks: z.array(PingTaskSchema).default([]),
-        basic_info: z.array(PingBasicInfoSchema).default([]),
-      }),
-    );
+export async function getPrimaryServiceOverview(uuid: string): Promise<PingOverviewItem> {
+  const serverId = Number.parseInt(uuid, 10);
+  if (!Number.isFinite(serverId) || serverId <= 0) {
     return {
-      count: data.count,
-      records: data.records,
-      tasks: data.tasks,
-      basicInfo: data.basic_info,
-    } as PingOverviewResponse;
+      client: uuid,
+      isAssigned: false,
+      lastValue: null,
+      values: [],
+      samples: [],
+      max: 1,
+      loss: null,
+    };
   }
+
+  const services = await getServerServices(serverId, "1d");
+  const primary = selectPrimaryService(services);
+  if (!primary) {
+    return {
+      client: uuid,
+      isAssigned: false,
+      lastValue: null,
+      values: [],
+      samples: [],
+      max: 1,
+      loss: null,
+    };
+  }
+
+  const records = buildPingRecordsFromService(primary);
+  const samples = records
+    .map((record) => ({
+      time: toTimestamp(record.time),
+      value: record.value,
+    }))
+    .filter((sample) => sample.time > 0)
+    .sort((left, right) => left.time - right.time);
+  const values = samples.map((sample) => sample.value);
+  const positives = values.filter((value) => value > 0);
+  const lastPositive = [...values].reverse().find((value) => value > 0) ?? null;
+  const lost = values.filter((value) => value <= 0).length;
+
+  return {
+    client: uuid,
+    isAssigned: true,
+    lastValue: lastPositive,
+    values,
+    samples,
+    max: positives.length > 0 ? Math.max(...positives) : 1,
+    loss: values.length > 0 ? (lost / values.length) * 100 : null,
+  };
 }

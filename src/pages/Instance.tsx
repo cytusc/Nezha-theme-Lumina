@@ -1,27 +1,29 @@
 import { startTransition, useEffect, useMemo, useState } from "react";
-import { useParams, Link } from "react-router-dom";
+import { Link, useParams } from "react-router-dom";
 import { ChevronLeft } from "lucide-react";
 import { InstanceDetails } from "@/components/instance/InstanceDetails";
 import { PingChart } from "@/components/instance/PingChart";
 import { LoadChart } from "@/components/instance/LoadChart";
-import {
-  buildLoadTimeRangeOptions,
-} from "@/components/instance/chartShared";
-import { usePublicConfig } from "@/hooks/usePublicConfig";
+import { buildLoadTimeRangeOptions } from "@/components/instance/chartShared";
+import { useAuth } from "@/hooks/useAuth";
 
 const FIXED_PING_HOURS = 24;
+const GUEST_LOAD_HISTORY_HOURS = 24;
+const MEMBER_LOAD_HISTORY_HOURS = 720;
 
 export function Instance() {
   const { uuid } = useParams<{ uuid: string }>();
-  const { data: config } = usePublicConfig();
+  const { data: me } = useAuth();
   const [chartType, setChartType] = useState<"load" | "ping">("load");
   const [loadHours, setLoadHours] = useState(0);
+  const maxLoadHistoryHours = me?.logged_in
+    ? MEMBER_LOAD_HISTORY_HOURS
+    : GUEST_LOAD_HISTORY_HOURS;
 
   const loadRanges = useMemo(
-    () => buildLoadTimeRangeOptions(config?.record_preserve_time),
-    [config?.record_preserve_time],
+    () => buildLoadTimeRangeOptions(maxLoadHistoryHours),
+    [maxLoadHistoryHours],
   );
-  const showPingChart = config?.theme_settings?.showPingChart !== false;
 
   useEffect(() => {
     window.scrollTo(0, 0);
@@ -33,20 +35,11 @@ export function Instance() {
     }
   }, [loadHours, loadRanges]);
 
-  useEffect(() => {
-    if (!showPingChart && chartType === "ping") {
-      setChartType("load");
-    }
-  }, [chartType, showPingChart]);
-
   if (!uuid) return null;
 
   return (
     <div className="flex flex-col gap-5 py-2">
-      <Link
-        to="/"
-        className="instance-page-back"
-      >
+      <Link to="/" className="instance-page-back">
         <ChevronLeft size={14} />
         返回
       </Link>
@@ -62,23 +55,18 @@ export function Instance() {
           >
             负载
           </button>
-          {showPingChart && (
-            <button
-              type="button"
-              data-active={chartType === "ping" ? "true" : "false"}
-              onClick={() => {
-                startTransition(() => setChartType("ping"));
-              }}
-            >
-              Ping
-            </button>
-          )}
+          <button
+            type="button"
+            data-active={chartType === "ping" ? "true" : "false"}
+            onClick={() => {
+              startTransition(() => setChartType("ping"));
+            }}
+          >
+            Ping
+          </button>
         </div>
         {chartType === "load" && (
-          <div
-            key={`${chartType}-ranges`}
-            className="instance-segmented is-scrollable"
-          >
+          <div key={`${chartType}-ranges`} className="instance-segmented is-scrollable">
             {loadRanges.map((range) => (
               <button
                 key={range.value}
@@ -109,13 +97,7 @@ export function Instance() {
           hidden={chartType !== "ping"}
           aria-hidden={chartType !== "ping"}
         >
-          {showPingChart ? (
-            <PingChart
-              uuid={uuid}
-              hours={FIXED_PING_HOURS}
-              active={chartType === "ping"}
-            />
-          ) : null}
+          <PingChart uuid={uuid} hours={FIXED_PING_HOURS} active={chartType === "ping"} />
         </div>
       </div>
     </div>

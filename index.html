@@ -6,19 +6,19 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <meta
       name="keywords"
-      content="server monitor, Komari Monitor, server uptime monitoring, real-time server status, server performance dashboard, monitoring tool" />
+      content="Nezha, server monitor, Nezha probe, real-time server status, server performance dashboard, Lumina theme" />
     <meta name="theme-color" content="#000000" />
     <meta name="mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-    <meta name="apple-mobile-web-app-title" content="Komari Monitor" />
-    <meta property="og:title" content="Komari Monitor" />
-    <meta property="og:description" content="A simple server monitor tool." />
+    <meta name="apple-mobile-web-app-title" content="Lumina for Nezha" />
+    <meta property="og:title" content="Lumina for Nezha" />
+    <meta property="og:description" content="Lumina front-end theme for Nezha monitoring." />
     <meta name="twitter:card" content="summary_large_image" />
-    <meta name="twitter:title" content="Komari Monitor" />
-    <meta name="twitter:description" content="A simple server monitor tool." />
-    <title>Komari Monitor</title>
-    <meta name="description" content="A simple server monitor tool." />
+    <meta name="twitter:title" content="Lumina for Nezha" />
+    <meta name="twitter:description" content="Lumina front-end theme for Nezha monitoring." />
+    <title>Lumina for Nezha</title>
+    <meta name="description" content="Lumina front-end theme for Nezha monitoring." />
     <script>
       (() => {
         const parseAppearance = (value) => {
@@ -39,18 +39,9 @@
         let appearance = "system";
         try {
           const explicitAppearance = parseAppearance(localStorage.getItem("appearance"));
-          const cachedDefaultAppearance = parseAppearance(
-            localStorage.getItem("appearance_default"),
-          );
           if (explicitAppearance != null) {
             appearance = explicitAppearance;
             localStorage.setItem("appearance", JSON.stringify(explicitAppearance));
-          } else if (cachedDefaultAppearance != null) {
-            appearance = cachedDefaultAppearance;
-            localStorage.setItem(
-              "appearance_default",
-              JSON.stringify(cachedDefaultAppearance),
-            );
           }
         } catch {
           appearance = "system";

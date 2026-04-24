@@ -1,5 +1,5 @@
 import { lossHeatColor } from "@/utils/metricTone";
-import type { PingOverviewBucket } from "@/types/komari";
+import type { PingOverviewBucket } from "@/types/monitor";
 
 const ACTIVE_BAR_HEIGHT = 0.84;
 

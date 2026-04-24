@@ -19,7 +19,7 @@ import {
 } from "./chartData";
 import { latencyHeatColor, lossHeatColor } from "@/utils/metricTone";
 import { usePreferences } from "@/hooks/usePreferences";
-import type { PingRecord } from "@/types/komari";
+import type { PingRecord } from "@/types/monitor";
 import type { TimedMetricPoint } from "./chartData";
 
 interface TooltipState {
@@ -434,7 +434,9 @@ export function PingChart({
               </div>
               <div className="instance-ping-task-stats">
                 <span>均值 {task.avg != null ? `${task.avg.toFixed(1)} ms` : "—"}</span>
-                <span style={{ color: lossHeatColor(task.loss) }}>丢包 {task.loss.toFixed(1)}%</span>
+                <span style={{ color: lossHeatColor(task.loss) }}>
+                  丢包 {task.loss != null ? `${task.loss.toFixed(1)}%` : "—"}
+                </span>
                 <span>p99 {task.p99 != null ? `${task.p99.toFixed(0)} ms` : "—"}</span>
                 <span>抖动 {task.volatility != null ? task.volatility.toFixed(2) : "—"}</span>
               </div>

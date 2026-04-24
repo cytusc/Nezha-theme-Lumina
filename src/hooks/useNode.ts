@@ -8,7 +8,7 @@ import {
   subscribeToNode,
   getSnapshot,
 } from "@/services/wsStore";
-import type { NodeDisplay, TrafficTrendSample } from "@/types/komari";
+import type { NodeDisplay, TrafficTrendSample } from "@/types/monitor";
 
 const EMPTY_TRAFFIC_TREND_SNAPSHOT: { up: TrafficTrendSample[]; down: TrafficTrendSample[] } = {
   up: [],

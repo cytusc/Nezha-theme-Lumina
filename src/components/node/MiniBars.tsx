@@ -1,5 +1,5 @@
 import { latencyHeatColor } from "@/utils/metricTone";
-import type { PingOverviewBucket } from "@/types/komari";
+import type { PingOverviewBucket } from "@/types/monitor";
 
 interface MiniBarsProps {
   /** Raw latency values (ms) ordered oldest→newest. Values ≤0 are treated as lost and dimmed. */

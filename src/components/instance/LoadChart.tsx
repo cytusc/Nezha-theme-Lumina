@@ -359,14 +359,15 @@ export function LoadChart({
   hours: number;
   active?: boolean;
 }) {
-  const queryHours = hours === 0 ? 1 : hours;
-  const { data, isLoading } = useLoadRecords(uuid, queryHours, active);
   const isRealtime = hours === 0;
-  const node = useNode(uuid, isRealtime && active);
+  const queryHours = isRealtime ? 24 : hours;
+  const node = useNode(uuid, active);
+  const { data, isLoading } = useLoadRecords(uuid, queryHours, active && Boolean(node));
   const { resolvedAppearance } = usePreferences();
   const { w, h } = useResponsiveChartSize("grid");
   const [realtimePoints, setRealtimePoints] = useState<ChartPoint[]>([]);
   const [connectNulls, setConnectNulls] = useState(false);
+  const waitingForNode = active && !node;
 
   useEffect(() => {
     if (!active || !isRealtime || !node) return;
@@ -419,7 +420,7 @@ export function LoadChart({
     return historyPoints;
   }, [historyPoints, isRealtime, realtimePoints]);
 
-  if (isLoading) {
+  if (waitingForNode || isLoading) {
     return <section className="instance-panel h-[260px] animate-pulse" aria-busy />;
   }
 

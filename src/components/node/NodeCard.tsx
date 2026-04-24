@@ -34,7 +34,7 @@ import { MetricBar } from "./MetricBar";
 import { MiniBars } from "./MiniBars";
 import { QualityBars } from "./QualityBars";
 import { clsx } from "clsx";
-import type { PingOverviewBucket, TrafficTrendSample } from "@/types/komari";
+import type { PingOverviewBucket, TrafficTrendSample } from "@/types/monitor";
 import type { TrafficRateDisplay } from "@/utils/format";
 
 function buildSubtitle(parts: Array<string | null | undefined>) {

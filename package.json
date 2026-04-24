@@ -1,9 +1,9 @@
 {
-  "name": "komari-theme-lumina",
+  "name": "nezha-theme-lumina",
   "private": true,
   "version": "1.0.0",
   "type": "module",
-  "description": "Komari theme",
+  "description": "Lumina front-end theme for Nezha",
   "author": "shark & codex",
   "scripts": {
     "dev": "vite",

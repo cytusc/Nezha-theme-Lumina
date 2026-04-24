@@ -1,9 +1,9 @@
 {
   "name": "Lumina",
   "short": "Lumina",
-  "description": "Komari theme",
+  "description": "Lumina front-end theme for Nezha",
   "version": "1.0.0",
   "author": "shark & codex",
-  "url": "https://github.com/stqfdyr/komari-theme-Lumina",
+  "url": "https://github.com/stqfdyr/Nezha-theme-Lumina",
   "preview": "preview.png"
 }

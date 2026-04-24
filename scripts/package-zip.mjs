@@ -1,4 +1,4 @@
-// Packages Lumina-vX.Y.Z.zip ready for `komari-theme.json` + `preview.png` + `dist/` drop-in.
+// Packages Lumina-vX.Y.Z.zip ready for `theme-manifest.json` + `preview.png` + `dist/`.
 // Uses Node's builtin zlib via a minimal zip stream (no external deps).
 
 import { createWriteStream, readdirSync, readFileSync, statSync } from "node:fs";
@@ -8,7 +8,7 @@ import zlib from "node:zlib";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const root = resolve(__dirname, "..");
-const manifest = JSON.parse(readFileSync(resolve(root, "komari-theme.json"), "utf8"));
+const manifest = JSON.parse(readFileSync(resolve(root, "theme-manifest.json"), "utf8"));
 const version = manifest.version ?? "0.0.0";
 const short = manifest.short ?? "Lumina";
 const outPath = resolve(root, `${short}-v${version}.zip`);
@@ -37,7 +37,7 @@ function walk(dir, base = dir) {
 }
 
 const entries = [
-  { path: "komari-theme.json", full: resolve(root, "komari-theme.json") },
+  { path: "theme-manifest.json", full: resolve(root, "theme-manifest.json") },
   { path: "preview.png", full: resolve(root, "preview.png") },
   ...walk(resolve(root, "dist"), root),
 ];

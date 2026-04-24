@@ -1,10 +1,8 @@
-import { useCallback, useEffect, useSyncExternalStore } from "react";
-import { usePublicConfig } from "@/hooks/usePublicConfig";
+import { useCallback, useSyncExternalStore } from "react";
 
 type Appearance = "system" | "light" | "dark";
 type ResolvedAppearance = "light" | "dark";
 const APPEARANCE_STORAGE_KEY = "appearance";
-const APPEARANCE_DEFAULT_STORAGE_KEY = "appearance_default";
 
 interface PrefsState {
   appearance: Appearance;
@@ -17,32 +15,21 @@ const DEFAULTS: PrefsState = {
 };
 
 let themeFlipTimer: number | null = null;
-let hasExplicitAppearancePreference = false;
-let defaultAppearanceSyncPromise: Promise<void> | null = null;
 
 function isAppearance(value: unknown): value is Appearance {
   return value === "system" || value === "light" || value === "dark";
 }
 
-function normalizeAppearance(value: unknown, fallback: Appearance = DEFAULTS.appearance): Appearance {
-  return isAppearance(value) ? value : fallback;
-}
-
-function resolveAppearance(a: Appearance): ResolvedAppearance {
-  if (a === "system") {
+function resolveAppearance(appearance: Appearance): ResolvedAppearance {
+  if (appearance === "system") {
     return window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
   }
-  return a;
+  return appearance;
 }
 
 function parseStoredAppearance(raw: string | null): Appearance | null {
-  if (raw == null) {
-    return null;
-  }
-
-  if (isAppearance(raw)) {
-    return raw;
-  }
+  if (raw == null) return null;
+  if (isAppearance(raw)) return raw;
 
   try {
     const parsed = JSON.parse(raw);
@@ -53,30 +40,18 @@ function parseStoredAppearance(raw: string | null): Appearance | null {
 }
 
 function readStoredAppearance() {
-  const parsed = parseStoredAppearance(localStorage.getItem(APPEARANCE_STORAGE_KEY));
-  const fallback =
-    parseStoredAppearance(localStorage.getItem(APPEARANCE_DEFAULT_STORAGE_KEY)) ??
-    DEFAULTS.appearance;
-  return {
-    appearance: parsed ?? fallback,
-    hasExplicitPreference: parsed != null,
-  };
+  return parseStoredAppearance(localStorage.getItem(APPEARANCE_STORAGE_KEY)) ?? DEFAULTS.appearance;
 }
 
 function persistAppearance(value: Appearance) {
-  // Store as JSON string for compatibility with older Lumina bundles that parsed this key.
   localStorage.setItem(APPEARANCE_STORAGE_KEY, JSON.stringify(value));
-}
-
-function persistDefaultAppearance(value: Appearance) {
-  localStorage.setItem(APPEARANCE_DEFAULT_STORAGE_KEY, JSON.stringify(value));
 }
 
 const listeners = new Set<() => void>();
 let snapshot: PrefsState = { ...DEFAULTS };
 
 function emit() {
-  for (const l of listeners) l();
+  for (const listener of listeners) listener();
 }
 
 function markThemeFlip() {
@@ -104,58 +79,15 @@ function commit(next: Partial<PrefsState>) {
   emit();
 }
 
-function syncDefaultAppearanceFromPublicConfig() {
-  if (hasExplicitAppearancePreference || defaultAppearanceSyncPromise) {
-    return defaultAppearanceSyncPromise;
-  }
-
-  defaultAppearanceSyncPromise = fetch("/api/public", {
-    credentials: "include",
-    headers: { Accept: "application/json" },
-  })
-    .then(async (resp) => {
-      if (!resp.ok) {
-        throw new Error(`Request /api/public failed: ${resp.status}`);
-      }
-      return (await resp.json()) as {
-        data?: {
-          theme_settings?: {
-            defaultAppearance?: unknown;
-          };
-        };
-      };
-    })
-    .then((payload) => {
-      if (hasExplicitAppearancePreference) return;
-      const appearance = normalizeAppearance(
-        payload?.data?.theme_settings?.defaultAppearance,
-      );
-      persistDefaultAppearance(appearance);
-      commit({ appearance });
-    })
-    .catch(() => {
-      // Keep the local fallback when public config is temporarily unavailable.
-    })
-    .finally(() => {
-      defaultAppearanceSyncPromise = null;
-    });
-
-  return defaultAppearanceSyncPromise;
-}
-
 let initialized = false;
 function initIfNeeded() {
   if (initialized) return;
   initialized = true;
-  const stored = readStoredAppearance();
-  hasExplicitAppearancePreference = stored.hasExplicitPreference;
-  if (stored.hasExplicitPreference) {
-    persistAppearance(stored.appearance);
-  }
-  commit({ appearance: stored.appearance });
-  if (!stored.hasExplicitPreference) {
-    void syncDefaultAppearanceFromPublicConfig();
-  }
+
+  const storedAppearance = readStoredAppearance();
+  persistAppearance(storedAppearance);
+  commit({ appearance: storedAppearance });
+
   window
     .matchMedia("(prefers-color-scheme: dark)")
     .addEventListener("change", () => {
@@ -165,9 +97,9 @@ function initIfNeeded() {
     });
 }
 
-function subscribe(l: () => void) {
-  listeners.add(l);
-  return () => listeners.delete(l);
+function subscribe(listener: () => void) {
+  listeners.add(listener);
+  return () => listeners.delete(listener);
 }
 
 function getSnapshot() {
@@ -177,20 +109,10 @@ function getSnapshot() {
 export function usePreferences() {
   initIfNeeded();
   const state = useSyncExternalStore(subscribe, getSnapshot, getSnapshot);
-  const { data: config } = usePublicConfig();
 
-  useEffect(() => {
-    if (!config) return;
-    if (hasExplicitAppearancePreference) return;
-    const defaultAppearance = normalizeAppearance(config.theme_settings?.defaultAppearance);
-    persistDefaultAppearance(defaultAppearance);
-    commit({ appearance: defaultAppearance });
-  }, [config?.theme_settings?.defaultAppearance]);
-
-  const setAppearance = useCallback((a: Appearance) => {
-    hasExplicitAppearancePreference = true;
-    persistAppearance(a);
-    commit({ appearance: a });
+  const setAppearance = useCallback((appearance: Appearance) => {
+    persistAppearance(appearance);
+    commit({ appearance });
   }, []);
 
   return {

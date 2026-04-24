@@ -175,73 +175,6 @@ export interface NodeDisplay extends NodeInfo {
   updatedAt: number;
 }
 
-export interface ThemeSettings {
-  accentColor?: "violet" | "blue" | "pink" | "mint" | "orange" | "graphite";
-  defaultAppearance?: "system" | "light" | "dark";
-  enableGlass?: boolean;
-  enableAdminButton?: boolean;
-  defaultView?: "grid" | "table" | "compact";
-  showSwap?: boolean;
-  showPingChart?: boolean;
-  showNetworkSpeed?: boolean;
-  showTraffic?: boolean;
-  offlineNodesBehind?: boolean;
-  homepagePingBindings?: Record<string, string[]>;
-  siteTitle?: string;
-}
-
-export const PublicConfigSchema = z
-  .object({
-    sitename: z.string().default(""),
-    description: z.string().default(""),
-    theme: z.string().default(""),
-    allow_cors: z.boolean().default(false),
-    disable_password_login: z.boolean().default(false),
-    oauth_enable: z.boolean().default(false),
-    private_site: z.boolean().default(false),
-    record_enabled: z.boolean().default(true),
-    record_preserve_time: z.number().default(0),
-    ping_record_preserve_time: z.number().default(0),
-    custom_head: z.string().default(""),
-    custom_body: z.string().default(""),
-    theme_settings: z.record(z.string(), z.unknown()).default({}),
-  })
-  .passthrough();
-
-export interface PublicConfig {
-  sitename: string;
-  description: string;
-  theme: string;
-  allow_cors: boolean;
-  disable_password_login: boolean;
-  oauth_enable: boolean;
-  private_site: boolean;
-  record_enabled: boolean;
-  record_preserve_time: number;
-  ping_record_preserve_time: number;
-  custom_head: string;
-  custom_body: string;
-  theme_settings: ThemeSettings & Record<string, unknown>;
-}
-
-export const AdminClientSchema = z
-  .object({
-    uuid: z.string(),
-    name: looseString.default(""),
-    group: z.union([z.string(), z.number()]).nullish().transform((v) => (v == null ? "" : String(v))),
-    region: z.union([z.string(), z.number()]).nullish().transform((v) => (v == null ? "" : String(v))),
-    weight: looseNumber.default(0),
-  })
-  .passthrough();
-
-export interface AdminClient {
-  uuid: string;
-  name: string;
-  group?: string | null;
-  region?: string | null;
-  weight: number;
-}
-
 export const MeSchema = z
   .object({
     logged_in: z.boolean().default(false),
@@ -335,7 +268,7 @@ export const PingTaskSchema = z
     id: z.number(),
     interval: z.number().default(60),
     name: z.string().default(""),
-    loss: z.number().default(0),
+    loss: z.number().nullable().default(null),
     clients: z.array(z.string()).default([]),
     type: z.string().default("icmp"),
     target: z.string().default(""),
@@ -347,7 +280,7 @@ export interface PingTask {
   id: number;
   interval: number;
   name: string;
-  loss: number;
+  loss: number | null;
   clients: string[];
   type: string;
   target: string;

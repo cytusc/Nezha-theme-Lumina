@@ -18,3 +18,8 @@ Thumbs.db
 
 .cache/
 coverage/
+
+# vibe 中间产物
+docs/plans/
+docs/requirements/
+outputs/runtime/

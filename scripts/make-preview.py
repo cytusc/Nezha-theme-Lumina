@@ -153,10 +153,10 @@ def main():
     meta_font = ImageFont.truetype(BODY_FONT, 18)
 
     draw.text((76, 82), "Lumina", font=title_font, fill=(25, 34, 47, 255))
-    draw.text((82, 186), "Komari theme", font=subtitle_font, fill=(60, 73, 95, 255))
+    draw.text((82, 186), "Nezha front-end theme", font=subtitle_font, fill=(60, 73, 95, 255))
     draw.text(
         (82, 238),
-        "Fast homepage rendering, polished detail pages,\nand a cleaner theme-manage workflow.",
+        "Fast homepage rendering, polished detail pages,\nand a cleaner Nezha dashboard experience.",
         font=body_font,
         fill=(76, 87, 108, 255),
         spacing=10,
@@ -171,11 +171,11 @@ def main():
     y = 394
     x += pill(draw, (x, y), "Detail view refresh", pill_font, (255, 244, 229, 220), (97, 61, 22, 255))
     x += 14
-    pill(draw, (x, y), "Theme-manage", pill_font, (226, 233, 245, 230), (39, 58, 87, 255))
+    pill(draw, (x, y), "Nezha-ready", pill_font, (226, 233, 245, 230), (39, 58, 87, 255))
 
     draw.text(
         (84, 640),
-        "Home  •  Detail  •  Theme manage",
+        "Home  •  Detail  •  Dashboard",
         font=meta_font,
         fill=(77, 89, 112, 230),
     )

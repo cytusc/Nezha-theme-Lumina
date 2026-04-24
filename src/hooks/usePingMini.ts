@@ -1,21 +1,11 @@
 import { useEffect, useMemo, useSyncExternalStore } from "react";
 import { useVisibleNodeUuids } from "@/hooks/useNode";
-import { usePublicConfig } from "@/hooks/usePublicConfig";
-import { getPingOverview } from "@/services/api";
-import type { PingOverviewBucket, PingOverviewItem } from "@/types/komari";
-import {
-  invertHomepagePingTaskBindings,
-  normalizeHomepagePingTaskBindings,
-  type HomepagePingTaskBindings,
-} from "@/utils/pingTasks";
+import { getPrimaryServiceOverview } from "@/services/api";
+import type { PingOverviewBucket, PingOverviewItem } from "@/types/monitor";
 
-const DEFAULT_PING_REFRESH_INTERVAL = 60_000;
-const MIN_PING_REFRESH_INTERVAL = 10_000;
-const MAX_PING_REFRESH_INTERVAL = 300_000;
-// Homepage mini charts intentionally stay at 24 frontend aggregation buckets.
-// The homepage cards are for quick trend reading, so we aggregate the latest hour into
-// 24 equal windows instead of showing one raw backend bucket per bar.
+const DEFAULT_PING_REFRESH_INTERVAL = 30_000;
 const MAX_VISIBLE_HOMEPAGE_PING_BUCKETS = 24;
+const PING_OVERVIEW_MISSING_GRACE_ROUNDS = 1;
 
 const EMPTY_PING: PingOverviewItem = {
   client: "",
@@ -27,50 +17,21 @@ const EMPTY_PING: PingOverviewItem = {
   loss: null,
 };
 
-interface PingOverviewMapResult {
-  assignmentKey: string;
-  intervalMs: number;
-  items: Map<string, PingOverviewItem>;
-}
-
 type Listener = () => void;
+
 interface PingOverviewStoreEntry {
   item: PingOverviewItem;
   missingRounds: number;
 }
 
-const PING_OVERVIEW_MISSING_GRACE_ROUNDS = 1;
-
-function toTimestamp(value: string | number) {
-  if (typeof value === "number") {
-    return value > 1_000_000_000_000 ? value : value * 1000;
-  }
-  const parsed = Date.parse(String(value));
-  return Number.isNaN(parsed) ? 0 : parsed;
-}
-
-function normalizeRefreshInterval(seconds: number | null | undefined) {
-  if (!Number.isFinite(seconds) || !seconds || seconds <= 0) {
-    return DEFAULT_PING_REFRESH_INTERVAL;
-  }
-
-  return Math.min(
-    MAX_PING_REFRESH_INTERVAL,
-    Math.max(MIN_PING_REFRESH_INTERVAL, seconds * 1000),
-  );
+interface PingOverviewStoreState {
+  visibleKey: string;
+  items: Map<string, PingOverviewStoreEntry>;
 }
 
 function normalizeVisibleUuids(uuids: string[]) {
   return Array.from(new Set(uuids.filter(Boolean))).sort((left, right) =>
     left.localeCompare(right),
-  );
-}
-
-function stringifyBindings(bindings: HomepagePingTaskBindings) {
-  return JSON.stringify(
-    Object.entries(bindings)
-      .map(([taskId, clients]) => [taskId, [...clients].sort((left, right) => left.localeCompare(right))])
-      .sort(([left], [right]) => Number(left) - Number(right)),
   );
 }
 
@@ -109,190 +70,38 @@ function equalPingItem(a: PingOverviewItem | undefined, b: PingOverviewItem | un
   );
 }
 
-function buildPingOverviewItems(
-  taskId: number,
-  records: Array<{ task_id: number; time: string | number; value: number; client: string }>,
-) {
-  const selectedRecords = records.filter((record) => record.task_id === taskId);
-  const grouped = new Map<string, Array<(typeof selectedRecords)[number]>>();
-  const lossStatsByClient = new Map<string, { total: number; lost: number }>();
-
-  for (const record of selectedRecords) {
-    if (!record.client) continue;
-    const current = grouped.get(record.client);
-    if (current) current.push(record);
-    else grouped.set(record.client, [record]);
-
-    const stats = lossStatsByClient.get(record.client) ?? { total: 0, lost: 0 };
-    stats.total += 1;
-    if (record.value <= 0) {
-      stats.lost += 1;
-    }
-    lossStatsByClient.set(record.client, stats);
-  }
-
-  const result = new Map<string, PingOverviewItem>();
-  for (const [client, clientRecords] of grouped) {
-    const sorted = [...clientRecords].sort(
-      (left, right) => toTimestamp(left.time) - toTimestamp(right.time),
-    );
-    const latestRecord = sorted[sorted.length - 1];
-    const values: number[] = new Array(sorted.length);
-    const samples: Array<{ time: number; value: number }> = [];
-    let max = 1;
-
-    for (let i = 0; i < sorted.length; i++) {
-      const record = sorted[i];
-      const value = record.value;
-      const time = toTimestamp(record.time);
-      values[i] = value;
-      if (time > 0) {
-        samples.push({ time, value });
-      }
-      if (value > max) {
-        max = value;
-      }
-    }
-
-    const lossStats = lossStatsByClient.get(client);
-    result.set(client, {
-      client,
-      isAssigned: true,
-      lastValue: latestRecord && latestRecord.value > 0 ? latestRecord.value : null,
-      values,
-      samples,
-      max,
-      loss: lossStats?.total ? (lossStats.lost / lossStats.total) * 100 : null,
-    });
-  }
-
-  return result;
-}
-
-function resolveSelectedTasks(
-  clientUuids: string[],
-  bindings: HomepagePingTaskBindings,
-) {
-  const selectedTaskByClient = new Map<string, number>();
-  const bindingSelection = invertHomepagePingTaskBindings(bindings);
-
-  for (const uuid of clientUuids) {
-    const taskId = bindingSelection.get(uuid);
-    if (taskId != null) {
-      selectedTaskByClient.set(uuid, taskId);
-    }
-  }
-
-  return selectedTaskByClient;
-}
-
-function buildAssignmentKey(selectedTaskByClient: Map<string, number>) {
-  return Array.from(selectedTaskByClient.entries())
-    .sort(([left], [right]) => left.localeCompare(right))
-    .map(([uuid, taskId]) => `${uuid}:${taskId}`)
-    .join("|");
-}
-
-async function buildOverviewMap(
-  hours: number,
-  clientUuids: string[],
-  bindings: HomepagePingTaskBindings,
-): Promise<PingOverviewMapResult> {
+async function buildOverviewMap(clientUuids: string[]) {
   const normalizedUuids = normalizeVisibleUuids(clientUuids);
-  if (normalizedUuids.length === 0) {
-    return {
-      assignmentKey: "",
-      intervalMs: DEFAULT_PING_REFRESH_INTERVAL,
-      items: new Map<string, PingOverviewItem>(),
-    };
-  }
-
-  const selectedTaskByClient = resolveSelectedTasks(normalizedUuids, bindings);
-  const selectedTaskIds = Array.from(new Set(selectedTaskByClient.values())).sort(
-    (left, right) => left - right,
-  );
-
-  if (selectedTaskIds.length === 0) {
-    return {
-      assignmentKey: "",
-      intervalMs: DEFAULT_PING_REFRESH_INTERVAL,
-      items: new Map<string, PingOverviewItem>(),
-    };
-  }
-
-  const overviewResults = await Promise.allSettled(
-    selectedTaskIds.map(async (taskId) => ({
-      taskId,
-      overview: await getPingOverview(hours, taskId),
+  const results = await Promise.allSettled(
+    normalizedUuids.map(async (uuid) => ({
+      uuid,
+      item: await getPrimaryServiceOverview(uuid),
     })),
   );
 
-  const itemsByTask = new Map<number, Map<string, PingOverviewItem>>();
-  const refreshIntervals: number[] = [];
-
-  for (const result of overviewResults) {
-    if (result.status !== "fulfilled") {
-      continue;
-    }
-
-    const {
-      taskId,
-      overview: { records, tasks },
-    } = result.value;
-    itemsByTask.set(taskId, buildPingOverviewItems(taskId, records));
-
-    const taskInterval = tasks.find((task) => task.id === taskId)?.interval;
-    refreshIntervals.push(normalizeRefreshInterval(taskInterval));
-  }
-
   const items = new Map<string, PingOverviewItem>();
-  for (const [uuid, taskId] of selectedTaskByClient) {
-    const item = itemsByTask.get(taskId)?.get(uuid);
-    if (item) {
-      items.set(uuid, item);
-      continue;
-    }
-    items.set(uuid, {
-      client: uuid,
-      isAssigned: true,
-      lastValue: null,
-      values: [],
-      samples: [],
-      max: 1,
-      loss: null,
-    });
+  for (const result of results) {
+    if (result.status !== "fulfilled") continue;
+    items.set(result.value.uuid, result.value.item);
   }
 
   return {
-    assignmentKey: buildAssignmentKey(selectedTaskByClient),
-    intervalMs:
-      refreshIntervals.length > 0
-        ? Math.min(...refreshIntervals)
-        : DEFAULT_PING_REFRESH_INTERVAL,
+    visibleKey: normalizedUuids.join("|"),
     items,
   };
 }
 
-interface PingOverviewStoreState {
-  assignmentKey: string;
-  intervalMs: number;
-  items: Map<string, PingOverviewStoreEntry>;
-}
-
 let pingOverviewState: PingOverviewStoreState = {
-  assignmentKey: "",
-  intervalMs: DEFAULT_PING_REFRESH_INTERVAL,
+  visibleKey: "",
   items: new Map(),
 };
 let scheduledVisibleUuids: string[] = [];
 let scheduledVisibleKey = "";
-let scheduledBindings: HomepagePingTaskBindings = {};
-let scheduledBindingsKey = stringifyBindings({});
 let pingRefreshInFlight = false;
 let pingRefreshTimer: number | null = null;
 const pingListeners = new Map<string, Set<Listener>>();
 
-function schedulePingRefresh(intervalMs: number) {
+function schedulePingRefresh(intervalMs = DEFAULT_PING_REFRESH_INTERVAL) {
   if (pingRefreshTimer != null) {
     window.clearTimeout(pingRefreshTimer);
   }
@@ -302,16 +111,12 @@ function schedulePingRefresh(intervalMs: number) {
   }, intervalMs);
 }
 
-function commitPingOverview(
-  assignmentKey: string,
-  intervalMs: number,
-  items: Map<string, PingOverviewItem>,
-) {
+function commitPingOverview(visibleKey: string, items: Map<string, PingOverviewItem>) {
   const prevItems = pingOverviewState.items;
   const nextItems = new Map<string, PingOverviewStoreEntry>();
   const touched = new Set<string>();
   const keys = new Set<string>([...prevItems.keys(), ...items.keys()]);
-  const preserveMissing = pingOverviewState.assignmentKey === assignmentKey;
+  const preserveMissing = pingOverviewState.visibleKey === visibleKey;
 
   for (const key of keys) {
     const prevEntry = prevItems.get(key);
@@ -350,8 +155,7 @@ function commitPingOverview(
   }
 
   if (
-    pingOverviewState.assignmentKey === assignmentKey &&
-    pingOverviewState.intervalMs === intervalMs &&
+    pingOverviewState.visibleKey === visibleKey &&
     touched.size === 0 &&
     nextItems.size === prevItems.size
   ) {
@@ -359,8 +163,7 @@ function commitPingOverview(
   }
 
   pingOverviewState = {
-    assignmentKey,
-    intervalMs,
+    visibleKey,
     items: nextItems,
   };
 
@@ -376,60 +179,37 @@ async function refreshPingOverview() {
 
   pingRefreshInFlight = true;
   const visibleKey = scheduledVisibleKey;
-  const bindingsKey = scheduledBindingsKey;
 
   try {
     if (scheduledVisibleUuids.length === 0) {
-      commitPingOverview("", DEFAULT_PING_REFRESH_INTERVAL, new Map());
+      commitPingOverview("", new Map());
       return;
     }
 
-    const next = await buildOverviewMap(
-      1,
-      scheduledVisibleUuids,
-      scheduledBindings,
-    );
-    if (
-      visibleKey === scheduledVisibleKey &&
-      bindingsKey === scheduledBindingsKey
-    ) {
-      commitPingOverview(next.assignmentKey, next.intervalMs, next.items);
-      schedulePingRefresh(next.intervalMs);
+    const next = await buildOverviewMap(scheduledVisibleUuids);
+    if (visibleKey === scheduledVisibleKey) {
+      commitPingOverview(next.visibleKey, next.items);
+      schedulePingRefresh();
     }
   } catch {
-    if (
-      visibleKey === scheduledVisibleKey &&
-      bindingsKey === scheduledBindingsKey
-    ) {
-      schedulePingRefresh(DEFAULT_PING_REFRESH_INTERVAL);
+    if (visibleKey === scheduledVisibleKey) {
+      schedulePingRefresh();
     }
   } finally {
     pingRefreshInFlight = false;
-    if (
-      visibleKey !== scheduledVisibleKey ||
-      bindingsKey !== scheduledBindingsKey
-    ) {
+    if (visibleKey !== scheduledVisibleKey) {
       void refreshPingOverview();
     }
   }
 }
 
-function ensurePingOverviewStarted(
-  visibleUuids: string[],
-  bindings: HomepagePingTaskBindings,
-) {
+function ensurePingOverviewStarted(visibleUuids: string[]) {
   const normalizedVisibleUuids = normalizeVisibleUuids(visibleUuids);
   const visibleKey = normalizedVisibleUuids.join("|");
-  const bindingsKey = stringifyBindings(bindings);
 
-  if (
-    scheduledVisibleKey !== visibleKey ||
-    scheduledBindingsKey !== bindingsKey
-  ) {
+  if (scheduledVisibleKey !== visibleKey) {
     scheduledVisibleUuids = normalizedVisibleUuids;
     scheduledVisibleKey = visibleKey;
-    scheduledBindings = bindings;
-    scheduledBindingsKey = bindingsKey;
 
     if (pingRefreshTimer != null) {
       window.clearTimeout(pingRefreshTimer);
@@ -471,15 +251,10 @@ function getPingSnapshot(uuid: string) {
 
 export function useHomepagePingOverview() {
   const visibleUuids = useVisibleNodeUuids();
-  const { data: config } = usePublicConfig();
-  const bindings = useMemo(
-    () => normalizeHomepagePingTaskBindings(config?.theme_settings?.homepagePingBindings),
-    [config?.theme_settings?.homepagePingBindings],
-  );
 
   useEffect(() => {
-    ensurePingOverviewStarted(visibleUuids, bindings);
-  }, [bindings, visibleUuids]);
+    ensurePingOverviewStarted(visibleUuids);
+  }, [visibleUuids]);
 }
 
 export function usePingMini(uuid: string): PingOverviewItem {
