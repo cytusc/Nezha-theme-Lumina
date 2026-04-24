@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, type RefObject } from "react";
 import type uPlot from "uplot";
 
 export interface TimeRangeOption {
@@ -100,7 +100,10 @@ export function getChartTooltipPosition({
   return { left, top };
 }
 
-export function useResponsiveChartSize(mode: "grid" | "wide") {
+export function useResponsiveChartSize(
+  mode: "grid" | "wide",
+  containerRef?: RefObject<HTMLElement | null>,
+) {
   const [size, setSize] = useState(
     mode === "grid"
       ? GRID_CHART_DEFAULT
@@ -108,48 +111,65 @@ export function useResponsiveChartSize(mode: "grid" | "wide") {
   );
 
   useEffect(() => {
+    function resolveContainerWidth() {
+      const containerWidth = containerRef?.current?.clientWidth ?? 0;
+      return Number.isFinite(containerWidth) && containerWidth > 0 ? containerWidth : null;
+    }
+
     function update() {
-      const width = window.innerWidth;
+      const viewportWidth = window.innerWidth;
+      const containerWidth = resolveContainerWidth();
       if (mode === "wide") {
         const height =
-          width < 720
+          viewportWidth < 720
             ? WIDE_CHART_MOBILE_HEIGHT
-            : width < 1024
+            : viewportWidth < 1024
               ? WIDE_CHART_TABLET_HEIGHT
               : WIDE_CHART_HEIGHT;
+        const resolvedWidth = containerWidth ?? (viewportWidth - WIDE_CHART_GUTTER);
         setSize({
-          w: Math.min(WIDE_CHART_MAX_WIDTH, Math.max(WIDE_CHART_MIN_WIDTH, width - WIDE_CHART_GUTTER)),
+          w: Math.max(WIDE_CHART_MIN_WIDTH, Math.floor(resolvedWidth)),
           h: height,
         });
         return;
       }
 
-      if (width >= 1280) {
+      if (viewportWidth >= 1280) {
         setSize({
-          w: Math.min(GRID_CHART_DESKTOP_MAX_WIDTH, (width - GRID_CHART_DESKTOP_GUTTER) / 3),
+          w: Math.min(GRID_CHART_DESKTOP_MAX_WIDTH, (viewportWidth - GRID_CHART_DESKTOP_GUTTER) / 3),
           h: GRID_CHART_HEIGHT,
         });
         return;
       }
 
-      if (width >= 768) {
+      if (viewportWidth >= 768) {
         setSize({
-          w: Math.min(GRID_CHART_TABLET_MAX_WIDTH, (width - GRID_CHART_TABLET_GUTTER) / 2),
+          w: Math.min(GRID_CHART_TABLET_MAX_WIDTH, (viewportWidth - GRID_CHART_TABLET_GUTTER) / 2),
           h: GRID_CHART_HEIGHT,
         });
         return;
       }
 
       setSize({
-        w: Math.max(WIDE_CHART_MIN_WIDTH - 20, width - GRID_CHART_MOBILE_GUTTER),
+        w: Math.max(WIDE_CHART_MIN_WIDTH - 20, viewportWidth - GRID_CHART_MOBILE_GUTTER),
         h: 136,
       });
     }
 
     update();
     window.addEventListener("resize", update);
+
+    if (containerRef?.current && typeof ResizeObserver !== "undefined") {
+      const observer = new ResizeObserver(() => update());
+      observer.observe(containerRef.current);
+      return () => {
+        observer.disconnect();
+        window.removeEventListener("resize", update);
+      };
+    }
+
     return () => window.removeEventListener("resize", update);
-  }, [mode]);
+  }, [containerRef, mode]);
 
   return size;
 }

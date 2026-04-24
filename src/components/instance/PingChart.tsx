@@ -63,7 +63,8 @@ export function PingChart({
 }) {
   const { data, isLoading, refetch } = usePingRecords(uuid, hours, active);
   const { resolvedAppearance } = usePreferences();
-  const { w, h } = useResponsiveChartSize("wide");
+  const chartWrapRef = useRef<HTMLDivElement | null>(null);
+  const { w, h } = useResponsiveChartSize("wide", chartWrapRef);
   const [hiddenTasks, setHiddenTasks] = useState<Set<number>>(new Set());
   const [connectNulls, setConnectNulls] = useState(false);
   const [cutPeak, setCutPeak] = useState(false);
@@ -451,7 +452,7 @@ export function PingChart({
         })}
       </div>
 
-      <div className="instance-uplot-wrap is-large">
+      <div ref={chartWrapRef} className="instance-uplot-wrap is-large">
         {chart && options ? (
           <>
             <UplotReact options={options} data={chart} />
