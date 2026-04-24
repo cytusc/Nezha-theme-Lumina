@@ -132,6 +132,33 @@ function shallowEqualDisplay(a: NodeDisplay, b: NodeDisplay) {
   );
 }
 
+function mergeSparseMetadata(prev: NodeDisplay, next: NodeDisplay): NodeDisplay {
+  return {
+    ...prev,
+    ...next,
+    name: next.name || prev.name,
+    region: next.region || prev.region,
+    cpu_name: next.cpu_name || prev.cpu_name,
+    cpu_cores: next.cpu_cores || prev.cpu_cores,
+    arch: next.arch || prev.arch,
+    virtualization: next.virtualization || prev.virtualization,
+    os: next.os || prev.os,
+    kernel_version: next.kernel_version || prev.kernel_version,
+    gpu_name: next.gpu_name || prev.gpu_name,
+    mem_total: next.mem_total || prev.mem_total,
+    swap_total: next.swap_total || prev.swap_total,
+    disk_total: next.disk_total || prev.disk_total,
+    billing_cycle: next.billing_cycle || prev.billing_cycle,
+    currency: next.currency || prev.currency,
+    expired_at: next.expired_at || prev.expired_at,
+    tags: next.tags || prev.tags,
+    public_remark: next.public_remark || prev.public_remark,
+    traffic_limit: next.traffic_limit || prev.traffic_limit,
+    traffic_limit_type: next.traffic_limit_type || prev.traffic_limit_type,
+    created_at: next.created_at || prev.created_at,
+  };
+}
+
 function materializeTrafficTrendSnapshot(
   buffer: TrafficTrendSample[],
   start: number,
@@ -260,7 +287,7 @@ function applyStreamSnapshot(payload: ReturnType<typeof parseServerStreamPayload
     rememberNodeDisplay(display);
 
     const prev = state.byUuid[display.uuid];
-    const merged = prev ? { ...prev, ...display } : display;
+    const merged = prev ? mergeSparseMetadata(prev, display) : display;
     nextByUuid[display.uuid] = merged;
     nextTrafficTrends[display.uuid] = state.trafficTrends[display.uuid] ?? EMPTY_TRAFFIC_TREND;
 

@@ -202,10 +202,91 @@ function normalizeDateTextToIso(dateText: string) {
   return Number.isNaN(Date.parse(iso)) ? "" : iso;
 }
 
+function normalizeExpireValue(value: unknown) {
+  if (typeof value === "number" && Number.isFinite(value) && value > 0) {
+    const date = new Date(value > 1_000_000_000_000 ? value : value * 1000);
+    return Number.isNaN(date.getTime()) ? "" : date.toISOString();
+  }
+
+  if (typeof value !== "string") return "";
+
+  const text = value.trim();
+  if (!text) return "";
+
+  const normalizedDate = normalizeDateTextToIso(text);
+  if (normalizedDate) return normalizedDate;
+
+  const parsed = Date.parse(text);
+  if (Number.isNaN(parsed)) return "";
+
+  return new Date(parsed).toISOString();
+}
+
+function pickStringField(
+  source: Record<string, unknown>,
+  keys: string[],
+): string {
+  for (const key of keys) {
+    const value = source[key];
+    if (typeof value === "string" && value.trim()) {
+      return value.trim();
+    }
+  }
+  return "";
+}
+
+function extractExpireInfoFromJson(publicNote: string) {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(publicNote);
+  } catch {
+    return null;
+  }
+
+  if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+    return { expiredAt: "", remark: "" };
+  }
+
+  const root = parsed as Record<string, unknown>;
+  const billingData =
+    (root.billingDataMod && typeof root.billingDataMod === "object" && !Array.isArray(root.billingDataMod)
+      ? (root.billingDataMod as Record<string, unknown>)
+      : null) ??
+    (root.billingData && typeof root.billingData === "object" && !Array.isArray(root.billingData)
+      ? (root.billingData as Record<string, unknown>)
+      : null);
+
+  const expiredAt =
+    normalizeExpireValue(billingData?.endDate) ||
+    normalizeExpireValue(root.endDate) ||
+    normalizeExpireValue(root.expired_at) ||
+    normalizeExpireValue(root.expiredAt) ||
+    normalizeExpireValue(root.expire_at) ||
+    normalizeExpireValue(root.expireAt) ||
+    normalizeExpireValue(root.expire) ||
+    normalizeExpireValue(root.expiration) ||
+    normalizeExpireValue(root.expires_at) ||
+    normalizeExpireValue(root.expiresAt);
+
+  const remark =
+    pickStringField(root, ["remark", "public_remark", "publicRemark", "note", "message", "description"]) ||
+    (billingData ? pickStringField(billingData, ["remark", "note", "message", "description"]) : "");
+
+  return {
+    expiredAt,
+    remark,
+  };
+}
+
 function extractExpireInfo(publicNote: string) {
   const text = publicNote.trim();
   if (!text) {
     return { expiredAt: "", remark: "" };
+  }
+
+  const jsonInfo = extractExpireInfoFromJson(text);
+  if (jsonInfo && (jsonInfo.expiredAt || jsonInfo.remark !== "")) {
+    return jsonInfo;
   }
 
   const patterns = [
