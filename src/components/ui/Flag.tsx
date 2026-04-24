@@ -98,6 +98,8 @@ export function Flag({ region, size = 14 }: FlagProps) {
         src={src}
         alt={alt}
         loading="lazy"
+        decoding="async"
+        fetchPriority="low"
         style={{
           width: "100%",
           height: "100%",

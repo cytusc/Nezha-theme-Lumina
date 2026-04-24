@@ -16,7 +16,11 @@ import {
   Power,
 } from "lucide-react";
 import { useNode, useNodeTrafficTrend } from "@/hooks/useNode";
-import { usePingMini, usePingMiniBuckets } from "@/hooks/usePingMini";
+import {
+  useHomepagePingRegistration,
+  usePingMini,
+  usePingMiniBuckets,
+} from "@/hooks/usePingMini";
 import {
   formatBytes,
   formatExpireDays,
@@ -88,7 +92,8 @@ export const NodeCard = memo(function NodeCard({
   const detailsActive = inViewport || interacting;
   const trafficTrend = useNodeTrafficTrend(uuid, detailsActive);
   const ping = usePingMini(uuid, detailsActive);
-  const pingBuckets = usePingMiniBuckets(ping);
+  useHomepagePingRegistration(uuid, detailsActive);
+  const pingBuckets = usePingMiniBuckets(ping, undefined, detailsActive);
   const [hoveredLatencyIndex, setHoveredLatencyIndex] = useState<number | null>(null);
   const [hoveredLossIndex, setHoveredLossIndex] = useState<number | null>(null);
   const hoveredLatencyBucket =

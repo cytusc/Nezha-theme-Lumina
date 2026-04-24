@@ -75,6 +75,7 @@ let scheduledVisibleUuids: string[] = [];
 let scheduledVisibleKey = "";
 let pingRefreshInFlight = false;
 let pingRefreshTimer: number | null = null;
+let pingRefreshAbortController: AbortController | null = null;
 const pingListeners = new Map<string, Set<Listener>>();
 
 function schedulePingRefresh(intervalMs = DEFAULT_PING_REFRESH_INTERVAL) {
@@ -155,8 +156,12 @@ function toPingOverviewMap(items: Record<string, PingOverviewItem>) {
 }
 
 async function buildOverviewMap(clientUuids: string[]) {
+  pingRefreshAbortController?.abort();
+  pingRefreshAbortController = new AbortController();
   const normalizedUuids = normalizeVisibleUuids(clientUuids);
-  const items = await getHomepagePingOverviewBatch(normalizedUuids);
+  const items = await getHomepagePingOverviewBatch(normalizedUuids, {
+    signal: pingRefreshAbortController.signal,
+  });
 
   return {
     visibleKey: normalizedUuids.join("|"),
@@ -172,7 +177,8 @@ async function refreshPingOverview() {
 
   try {
     if (scheduledVisibleUuids.length === 0) {
-      commitPingOverview("", new Map());
+      pingRefreshAbortController?.abort();
+      pingRefreshAbortController = null;
       return;
     }
 
@@ -181,7 +187,10 @@ async function refreshPingOverview() {
       commitPingOverview(next.visibleKey, next.items);
       schedulePingRefresh();
     }
-  } catch {
+  } catch (error) {
+    if (error instanceof DOMException && error.name === "AbortError") {
+      return;
+    }
     if (visibleKey === scheduledVisibleKey) {
       schedulePingRefresh();
     }
@@ -209,6 +218,8 @@ export function ensurePingOverviewStarted(visibleUuids: string[]) {
   if (scheduledVisibleKey !== visibleKey) {
     scheduledVisibleUuids = normalizedVisibleUuids;
     scheduledVisibleKey = visibleKey;
+    pingRefreshAbortController?.abort();
+    pingRefreshAbortController = null;
 
     if (pingRefreshTimer != null) {
       window.clearTimeout(pingRefreshTimer);
@@ -247,4 +258,3 @@ export function subscribeToPingItem(uuid: string, listener: Listener) {
 export function getPingSnapshot(uuid: string) {
   return pingOverviewState.items.get(uuid)?.item ?? EMPTY_PING;
 }
-

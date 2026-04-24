@@ -397,10 +397,14 @@ function isOnline(lastActive: string | number | null | undefined, nowMs: number)
 async function apiGet<TSchema extends z.ZodTypeAny>(
   path: string,
   schema: TSchema,
+  options?: {
+    signal?: AbortSignal;
+  },
 ): Promise<z.output<TSchema>> {
   const resp = await fetch(path, {
     credentials: "include",
     headers: { Accept: "application/json" },
+    signal: options?.signal,
   });
 
   if (!resp.ok) {
@@ -563,6 +567,9 @@ export async function getHomeBootstrap(): Promise<HomeBootstrapPayload> {
 
 export async function getHomepagePingOverviewBatch(
   uuids: string[],
+  options?: {
+    signal?: AbortSignal;
+  },
 ): Promise<Record<string, PingOverviewItem>> {
   const normalized = Array.from(new Set(uuids.map((uuid) => uuid.trim()).filter(Boolean))).sort(
     (left, right) => left.localeCompare(right, undefined, { numeric: true }),
@@ -572,7 +579,7 @@ export async function getHomepagePingOverviewBatch(
 
   const search = new URLSearchParams();
   search.set("uuids", normalized.join(","));
-  return await apiGet(`/lumina-api/ping-overview?${search.toString()}`, PingOverviewMapSchema);
+  return await apiGet(`/lumina-api/ping-overview?${search.toString()}`, PingOverviewMapSchema, options);
 }
 
 export async function getMe(): Promise<Me> {
