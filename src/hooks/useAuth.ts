@@ -5,8 +5,8 @@ export function useAuth() {
   return useQuery({
     queryKey: ["me"],
     queryFn: getMe,
-    staleTime: 0,
-    refetchOnMount: "always",
-    refetchOnWindowFocus: true,
+    staleTime: 5 * 60_000,
+    refetchOnMount: false,
+    refetchOnWindowFocus: false,
   });
 }
