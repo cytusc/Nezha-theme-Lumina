@@ -84,6 +84,7 @@ export interface NodeInfo {
   expired_at?: string | null;
   tags: string;
   public_remark: string;
+  /** Optional traffic quota, unit: bytes. */
   traffic_limit: number;
   traffic_limit_type: string;
   created_at: string;
@@ -118,9 +119,13 @@ export const NodeRealtimeSchema = z
       .default({ total: 0, used: 0 }),
     network: z
       .object({
+        /** Network throughput, unit: bytes per second. */
         up: z.number().default(0),
+        /** Network throughput, unit: bytes per second. */
         down: z.number().default(0),
+        /** Cumulative traffic total, unit: bytes. */
         totalUp: z.number().default(0),
+        /** Cumulative traffic total, unit: bytes. */
         totalDown: z.number().default(0),
       })
       .passthrough()
@@ -141,6 +146,7 @@ export interface NodeRealtime {
   swap: { total: number; used: number };
   load: { load1: number; load5: number; load15: number };
   disk: { total: number; used: number };
+  /** `up/down` are bytes per second, `totalUp/totalDown` are cumulative bytes. */
   network: { up: number; down: number; totalUp: number; totalDown: number };
   connections: { tcp: number; udp: number };
   uptime: number;
@@ -161,9 +167,13 @@ export interface NodeDisplay extends NodeInfo {
   diskUsed: number;
   diskTotal: number;
   diskPct: number;
+  /** Current upload throughput, unit: bytes per second. */
   netUp: number;
+  /** Current download throughput, unit: bytes per second. */
   netDown: number;
+  /** Cumulative outbound traffic, unit: bytes. */
   trafficUp: number;
+  /** Cumulative inbound traffic, unit: bytes. */
   trafficDown: number;
   uptime: number;
   load1: number;
@@ -213,9 +223,13 @@ export const LoadRecordSchema = z
     temp: z.number().default(0),
     disk: z.number().default(0),
     disk_total: z.number().default(0),
+    /** Historical network throughput, unit: bytes per second. */
     net_in: z.number().default(0),
+    /** Historical network throughput, unit: bytes per second. */
     net_out: z.number().default(0),
+    /** Historical cumulative outbound traffic, unit: bytes. */
     net_total_up: z.number().default(0),
+    /** Historical cumulative inbound traffic, unit: bytes. */
     net_total_down: z.number().default(0),
     process: z.number().default(0),
     connections: z.number().default(0),
@@ -236,9 +250,13 @@ export interface LoadRecord {
   temp: number;
   disk: number;
   disk_total: number;
+  /** Network throughput, unit: bytes per second. */
   net_in: number;
+  /** Network throughput, unit: bytes per second. */
   net_out: number;
+  /** Cumulative traffic total, unit: bytes. */
   net_total_up: number;
+  /** Cumulative traffic total, unit: bytes. */
   net_total_down: number;
   process: number;
   connections: number;

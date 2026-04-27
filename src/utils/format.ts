@@ -5,6 +5,7 @@ export type TrafficRateUnit = "B/s" | "KB/s" | "MB/s" | "GB/s" | "TB/s";
 export interface TrafficRateDisplay {
   value: string;
   unit: TrafficRateUnit;
+  /** Raw network throughput in bytes per second. */
   bytesPerSec: number;
 }
 
@@ -35,6 +36,14 @@ function formatRateValue(value: number): string {
   return trimFixed(value, 3);
 }
 
+/**
+ * Format network throughput.
+ *
+ * Note:
+ * - input is bytes per second, not bits per second
+ * - use this for netUp / netDown / net_in / net_out style fields
+ * - do not use for cumulative traffic totals such as trafficUp / trafficDown
+ */
 export function formatTrafficRate(bytesPerSec: number | undefined | null): TrafficRateDisplay {
   if (!bytesPerSec || !Number.isFinite(bytesPerSec) || bytesPerSec <= 0) {
     return {
@@ -68,6 +77,7 @@ export function formatTrafficRate(bytesPerSec: number | undefined | null): Traff
   };
 }
 
+/** Convenience wrapper for network throughput labels like `12.4 MB/s`. */
 export function formatTrafficRateLabel(bytesPerSec: number | undefined | null): string {
   const rate = formatTrafficRate(bytesPerSec);
   return `${rate.value} ${rate.unit}`;

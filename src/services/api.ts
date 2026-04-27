@@ -40,9 +40,13 @@ const NezhaStateSchema = z
     mem_used: z.number().default(0),
     swap_used: z.number().default(0),
     disk_used: z.number().default(0),
+    /** Cumulative inbound traffic, unit: bytes. */
     net_in_transfer: z.number().default(0),
+    /** Cumulative outbound traffic, unit: bytes. */
     net_out_transfer: z.number().default(0),
+    /** Inbound throughput, unit: bytes per second. */
     net_in_speed: z.number().default(0),
+    /** Outbound throughput, unit: bytes per second. */
     net_out_speed: z.number().default(0),
     uptime: z.number().default(0),
     load_1: z.number().default(0),
@@ -192,6 +196,13 @@ const SERVICE_CACHE_TTL_MS = 30_000;
 const GUEST_HISTORY_HOURS = 24;
 const ONLINE_GRACE_MS = 65_000;
 
+/**
+ * Map Nezha metric keys to the local historical record model.
+ *
+ * Naming convention reminder:
+ * - `net_in` / `net_out` are network throughput, unit: bytes per second
+ * - `net_total_down` / `net_total_up` are cumulative traffic totals, unit: bytes
+ */
 const LOAD_METRIC_MAP = {
   cpu: "cpu",
   memory: "ram",
