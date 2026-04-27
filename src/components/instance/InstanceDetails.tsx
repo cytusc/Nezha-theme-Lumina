@@ -1,5 +1,5 @@
 import { useNode } from "@/hooks/useNode";
-import { formatBytes, formatUptimeDays } from "@/utils/format";
+import { formatBytes, formatTrafficRateLabel, formatUptimeDays } from "@/utils/format";
 import { InstancePanel } from "./InstancePanel";
 
 export function InstanceDetails({ uuid }: { uuid: string }) {
@@ -69,7 +69,7 @@ export function InstanceDetails({ uuid }: { uuid: string }) {
           <div className="instance-info-group-title">网络</div>
           <InfoRow
             label={isOnline ? "实时网络" : "缓存网络"}
-            value={`↑ ${formatBytes(node.netUp)}/s · ↓ ${formatBytes(node.netDown)}/s`}
+            value={`↑ ${formatTrafficRateLabel(node.netUp)} · ↓ ${formatTrafficRateLabel(node.netDown)}`}
           />
           <InfoRow label={isOnline ? "最近更新" : "最后上报"} value={lastUpdated} />
           <div className="instance-info-item is-stack">
