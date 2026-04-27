@@ -1,11 +1,11 @@
 const UNITS = ["B", "KB", "MB", "GB", "TB", "PB"] as const;
 export type ExpireTone = "ok" | "warn" | "critical" | "long" | "none";
-export type TrafficRateUnit = "bps" | "Kbps" | "Mbps" | "Gbps" | "Tbps";
+export type TrafficRateUnit = "B/s" | "KB/s" | "MB/s" | "GB/s" | "TB/s";
 
 export interface TrafficRateDisplay {
   value: string;
   unit: TrafficRateUnit;
-  bitsPerSec: number;
+  bytesPerSec: number;
 }
 
 function trimFixed(value: number, digits: number): string {
@@ -39,33 +39,32 @@ export function formatTrafficRate(bytesPerSec: number | undefined | null): Traff
   if (!bytesPerSec || !Number.isFinite(bytesPerSec) || bytesPerSec <= 0) {
     return {
       value: "0",
-      unit: "bps",
-      bitsPerSec: 0,
+      unit: "B/s",
+      bytesPerSec: 0,
     };
   }
 
-  const bitsPerSec = bytesPerSec * 8;
-  const thresholds: Array<{ unit: Exclude<TrafficRateUnit, "bps">; divisor: number }> = [
-    { unit: "Tbps", divisor: 1_000_000_000_000 },
-    { unit: "Gbps", divisor: 1_000_000_000 },
-    { unit: "Mbps", divisor: 1_000_000 },
-    { unit: "Kbps", divisor: 1_000 },
+  const thresholds: Array<{ unit: Exclude<TrafficRateUnit, "B/s">; divisor: number }> = [
+    { unit: "TB/s", divisor: 1024 ** 4 },
+    { unit: "GB/s", divisor: 1024 ** 3 },
+    { unit: "MB/s", divisor: 1024 ** 2 },
+    { unit: "KB/s", divisor: 1024 },
   ];
 
   for (const { unit, divisor } of thresholds) {
-    if (bitsPerSec >= divisor) {
+    if (bytesPerSec >= divisor) {
       return {
-        value: formatRateValue(bitsPerSec / divisor),
+        value: formatRateValue(bytesPerSec / divisor),
         unit,
-        bitsPerSec,
+        bytesPerSec,
       };
     }
   }
 
   return {
-    value: bitsPerSec >= 100 ? Math.round(bitsPerSec).toString() : trimFixed(bitsPerSec, 1),
-    unit: "bps",
-    bitsPerSec,
+    value: bytesPerSec >= 100 ? Math.round(bytesPerSec).toString() : trimFixed(bytesPerSec, 1),
+    unit: "B/s",
+    bytesPerSec,
   };
 }
 

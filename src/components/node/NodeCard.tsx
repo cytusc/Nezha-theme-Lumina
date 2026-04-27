@@ -460,7 +460,7 @@ function TrafficStat({
               boxShadow: `0 0 0 4px color-mix(in srgb, ${color} 22%, transparent)`,
             }}
           />
-          <span>{live ? (rate.bitsPerSec > 0 ? "实时" : "空闲") : "离线"}</span>
+          <span>{live ? (rate.bytesPerSec > 0 ? "实时" : "空闲") : "离线"}</span>
         </span>
       </div>
       <div className="traffic-stat-foot">
