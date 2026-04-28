@@ -50,6 +50,26 @@ function buildSubtitle(parts: Array<string | null | undefined>) {
     .join(" · ");
 }
 
+function splitByteLabel(text: string) {
+  const match = text.match(/^(.+?)\s([A-Z]+)$/);
+  if (!match) return { value: text, unit: "" };
+  return {
+    value: match[1],
+    unit: match[2],
+  };
+}
+
+function formatCompactBytePair(used: number, total: number) {
+  const usedLabel = splitByteLabel(formatBytes(used));
+  const totalLabel = splitByteLabel(formatBytes(total));
+
+  if (usedLabel.unit && usedLabel.unit === totalLabel.unit) {
+    return `${usedLabel.value}/${totalLabel.value} ${usedLabel.unit}`;
+  }
+
+  return `${usedLabel.value} ${usedLabel.unit}/${totalLabel.value} ${totalLabel.unit}`.trim();
+}
+
 function formatBucketWindow(bucket: PingOverviewBucket | null) {
   if (!bucket || bucket.startAt == null || bucket.endAt == null) {
     return null;
@@ -135,10 +155,12 @@ export const NodeCard = memo(function NodeCard({
   const loadFraction = Math.max(0, Math.min(1, node.load1 / loadBaseline));
   const upRate = formatTrafficRate(node.netUp);
   const downRate = formatTrafficRate(node.netDown);
+  const ramDetail = formatCompactBytePair(node.ramUsed, node.ramTotal);
   const swapDetail =
     node.swapTotal > 0
-      ? `${formatBytes(node.swapUsed)} / ${formatBytes(node.swapTotal)}`
+      ? formatCompactBytePair(node.swapUsed, node.swapTotal)
       : "无";
+  const diskDetail = formatCompactBytePair(node.diskUsed, node.diskTotal);
   const lossHoverColor = hoveredLossBucket ? lossHeatColor(hoveredLossBucket.loss) : null;
   const hasHomepagePingBinding = ping.isAssigned;
 
@@ -217,7 +239,7 @@ export const NodeCard = memo(function NodeCard({
               label="内存"
               valueText={node.ramPct.toFixed(2)}
               unit="%"
-              detailText={`${formatBytes(node.ramUsed)} / ${formatBytes(node.ramTotal)} · Swap ${swapDetail}`}
+              detailText={`${ramDetail} · S ${swapDetail}`}
               fraction={node.ramPct / 100}
               fill="linear-gradient(90deg, color-mix(in srgb, var(--progress-memory) 84%, white 6%) 0%, var(--progress-memory) 100%)"
             />
@@ -226,7 +248,7 @@ export const NodeCard = memo(function NodeCard({
               label="磁盘"
               valueText={node.diskPct.toFixed(1)}
               unit="%"
-              detailText={`${formatBytes(node.diskUsed)} / ${formatBytes(node.diskTotal)}`}
+              detailText={diskDetail}
               fraction={node.diskPct / 100}
               fill="linear-gradient(90deg, color-mix(in srgb, var(--progress-disk) 88%, white 2%) 0%, var(--progress-disk) 100%)"
             />
@@ -381,7 +403,7 @@ export const NodeCard = memo(function NodeCard({
             <FooterStat
               icon={<Workflow size={13} strokeWidth={2} />}
               label="TCP/UDP"
-              value={`${node.connectionsTcp} / ${node.connectionsUdp}`}
+              value={`${node.connectionsTcp}/${node.connectionsUdp}`}
               color="var(--status-success)"
             />
           </div>
