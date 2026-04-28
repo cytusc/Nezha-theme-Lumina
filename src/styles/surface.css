@@ -831,8 +831,8 @@
 .server-card-content {
   display: flex;
   flex-direction: column;
-  padding: 22px 20px 16px;
-  gap: 18px;
+  padding: 16px 16px 14px;
+  gap: 14px;
 }
 
 .server-card-header {
@@ -928,13 +928,13 @@
 .server-card-stack {
   display: flex;
   flex-direction: column;
-  gap: 18px;
+  gap: 14px;
 }
 
 .server-metric-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 14px 18px;
+  gap: 14px 12px;
 }
 
 .metric-item {
@@ -998,13 +998,13 @@
 .server-traffic-section {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 18px;
+  gap: 14px;
 }
 
 .traffic-stat {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 8px;
   min-width: 0;
 }
 
@@ -1024,16 +1024,16 @@
 .server-card-meta-label {
   display: inline-flex;
   align-items: center;
-  gap: 7px;
+  gap: 5px;
   color: var(--text-secondary);
-  font-size: 11px;
+  font-size: 10px;
   font-weight: 600;
   letter-spacing: 0.02em;
 }
 
 .traffic-stat-value {
   flex: 0 0 auto;
-  font-size: 20px;
+  font-size: 18px;
   font-weight: 640;
   letter-spacing: -0.03em;
 }
@@ -1100,7 +1100,7 @@
 .server-card-meta-unit {
   margin-left: 2px;
   color: var(--text-tertiary);
-  font-size: 11px;
+  font-size: 10px;
   font-weight: 500;
 }
 
@@ -1125,7 +1125,7 @@
 
 .traffic-stat-foot {
   color: var(--text-secondary);
-  font-size: 12px;
+  font-size: 11px;
 }
 
 .traffic-stat-total-label {
@@ -1151,7 +1151,7 @@
 .server-health-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 18px;
+  gap: 12px;
 }
 
 .server-health-block {
@@ -1185,7 +1185,7 @@
 .server-health-value,
 .server-card-meta-value {
   flex: 0 0 auto;
-  font-size: 16px;
+  font-size: 15px;
   font-weight: 640;
   letter-spacing: -0.03em;
 }
@@ -1210,7 +1210,7 @@
 .server-card-meta-grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 18px;
+  gap: 8px;
 }
 
 /* Tags row — no top border; pills sit flush after footer meta row */
