@@ -1019,18 +1019,6 @@
   min-width: 0;
 }
 
-.server-card-meta {
-  flex-direction: column;
-  align-items: flex-start;
-  justify-content: flex-start;
-  gap: 4px;
-}
-
-.server-card-meta .server-card-meta-label {
-  gap: 4px;
-  font-size: 9px;
-}
-
 .traffic-stat-label,
 .server-health-label,
 .server-card-meta-label {
@@ -1203,9 +1191,7 @@
 }
 
 .server-card-meta-value {
-  width: 100%;
-  text-align: right;
-  font-size: 14px;
+  white-space: nowrap;
 }
 
 .mini-bar-row {
