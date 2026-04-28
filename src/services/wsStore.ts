@@ -17,6 +17,12 @@ interface State {
   failureStreak: number;
 }
 
+interface StoreStatusSnapshot {
+  initialized: boolean;
+  lastSuccessAt: number;
+  failureStreak: number;
+}
+
 interface TrafficTrendSeries {
   buffer: TrafficTrendSample[];
   start: number;
@@ -263,12 +269,31 @@ function sortDisplays(displays: NodeDisplay[]) {
 
 let state: State = emptyState();
 const globalListeners = new Set<Listener>();
+const statusListeners = new Set<Listener>();
 const nodeListeners = new Map<string, Set<Listener>>();
 let visibleNodeUuidsSnapshot: string[] = [];
+let statusSnapshot: StoreStatusSnapshot = {
+  initialized: false,
+  lastSuccessAt: 0,
+  failureStreak: 0,
+};
 
 function commit(next: State, touched: Iterable<string>) {
+  const statusChanged =
+    next.initialized !== state.initialized ||
+    next.lastSuccessAt !== state.lastSuccessAt ||
+    next.failureStreak !== state.failureStreak;
+
   state = next;
   for (const listener of globalListeners) listener();
+  if (statusChanged) {
+    statusSnapshot = {
+      initialized: next.initialized,
+      lastSuccessAt: next.lastSuccessAt,
+      failureStreak: next.failureStreak,
+    };
+    for (const listener of statusListeners) listener();
+  }
   for (const uuid of touched) {
     const listeners = nodeListeners.get(uuid);
     if (!listeners) continue;
@@ -449,6 +474,13 @@ export function subscribe(listener: Listener): () => void {
   };
 }
 
+export function subscribeToStatus(listener: Listener): () => void {
+  statusListeners.add(listener);
+  return () => {
+    statusListeners.delete(listener);
+  };
+}
+
 export function subscribeToNode(uuid: string, listener: Listener): () => void {
   let listeners = nodeListeners.get(uuid);
   if (!listeners) {
@@ -467,6 +499,10 @@ export function subscribeToNode(uuid: string, listener: Listener): () => void {
 
 export function getSnapshot(): State {
   return state;
+}
+
+export function getStatusSnapshot(): StoreStatusSnapshot {
+  return statusSnapshot;
 }
 
 export function getNodeSnapshot(uuid: string): NodeDisplay | undefined {

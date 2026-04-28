@@ -7,7 +7,7 @@ interface UseElementVisibilityOptions {
 
 export function useElementVisibility<T extends Element>(
   ref: RefObject<T | null>,
-  { rootMargin = "240px 0px", threshold = 0.05 }: UseElementVisibilityOptions = {},
+  { rootMargin = "120px 0px", threshold = 0.05 }: UseElementVisibilityOptions = {},
 ) {
   const [visible, setVisible] = useState(false);
 
@@ -20,7 +20,8 @@ export function useElementVisibility<T extends Element>(
 
     const observer = new IntersectionObserver(
       ([entry]) => {
-        setVisible(entry?.isIntersecting ?? false);
+        const nextVisible = entry?.isIntersecting ?? false;
+        setVisible((current) => (current === nextVisible ? current : nextVisible));
       },
       {
         rootMargin,
@@ -36,4 +37,3 @@ export function useElementVisibility<T extends Element>(
 
   return visible;
 }
-

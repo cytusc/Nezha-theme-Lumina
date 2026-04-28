@@ -3,11 +3,12 @@ import { ensureHomeBootstrap } from "@/services/homeBootstrap";
 import {
   ensureStarted,
   getNodeSnapshot,
+  getStatusSnapshot,
   getNodeTrafficTrendSnapshot,
   getVisibleNodeUuidsSnapshot,
   subscribe,
+  subscribeToStatus,
   subscribeToNode,
-  getSnapshot,
 } from "@/services/wsStore";
 import type { NodeDisplay, TrafficTrendSample } from "@/types/monitor";
 
@@ -56,7 +57,11 @@ export function useVisibleNodeUuids(): string[] {
 
 export function useNodeStoreStatus() {
   useEnsured();
-  const snap = useSyncExternalStore(subscribe, getSnapshot, getSnapshot);
+  const snap = useSyncExternalStore(
+    subscribeToStatus,
+    getStatusSnapshot,
+    getStatusSnapshot,
+  );
   return useMemo(
     () => ({
       initialized: snap.initialized,
