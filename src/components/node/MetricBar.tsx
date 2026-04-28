@@ -37,8 +37,8 @@ export function MetricBar({
           <span>{icon}</span>
           <span className="text-[11px] font-medium tracking-[0.02em]">{label}</span>
         </div>
-        <div className="tabular text-[13px] text-[var(--text-primary)] whitespace-nowrap overflow-hidden text-ellipsis max-w-full text-right">
-          <span className="font-semibold">{valueText}</span>
+        <div className="tabular text-[15px] text-[var(--text-primary)] whitespace-nowrap overflow-hidden text-ellipsis max-w-full text-right">
+          <span className="font-bold">{valueText}</span>
           {unit && (
             <span className="ml-[1px] text-[11px] text-[var(--text-tertiary)]">{unit}</span>
           )}
@@ -74,10 +74,10 @@ export function MetricBar({
             );
           })}
         </div>
-        {secondaryFraction !== undefined && secondaryFill && (
-          <div className="metric-track is-secondary">
+        {secondaryFill && (
+          <div className="metric-track is-secondary" style={{ visibility: secondaryFraction !== undefined ? 'visible' : 'hidden' }}>
             {METRIC_SEGMENT_INDICES.map((index) => {
-              const secondaryActiveSegments = Math.max(0, Math.min(1, secondaryFraction)) * METRIC_SEGMENT_COUNT;
+              const secondaryActiveSegments = Math.max(0, Math.min(1, secondaryFraction ?? 0)) * METRIC_SEGMENT_COUNT;
               const fillLevel = Math.max(0, Math.min(1, secondaryActiveSegments - index));
               const isActive = fillLevel > 0;
               return (

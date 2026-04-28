@@ -792,9 +792,11 @@
 .server-card {
   position: relative;
   background:
-    linear-gradient(180deg, color-mix(in srgb, var(--surface) 94%, transparent) 0%, color-mix(in srgb, var(--surface) 98%, black 2%) 100%);
+    linear-gradient(180deg, color-mix(in srgb, var(--surface) 86%, transparent) 0%, color-mix(in srgb, var(--surface) 94%, black 2%) 100%);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
   border: 1px solid color-mix(in srgb, var(--border) 84%, transparent);
-  border-radius: 18px;
+  border-radius: 24px;
   content-visibility: auto;
   contain-intrinsic-size: 438px;
   box-shadow: var(--shadow-card);
@@ -919,10 +921,12 @@
   text-overflow: ellipsis;
   white-space: nowrap;
   color: color-mix(in srgb, var(--text-primary) 64%, var(--text-tertiary));
-  font-size: 11px;
+  font-family: var(--font-mono), monospace;
+  font-size: 10px;
   font-weight: 600;
   line-height: 1.2;
-  letter-spacing: 0.01em;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
 }
 
 .server-card-stack {
@@ -971,8 +975,8 @@
 .metric-track {
   display: flex;
   align-items: stretch;
-  gap: 2px;
-  height: 10px;
+  gap: 3px;
+  height: 12px;
   min-width: 0;
   contain: paint;
 }
@@ -986,7 +990,7 @@
   flex: 1 1 0;
   min-width: 1px;
   height: 100%;
-  border-radius: 2px;
+  border-radius: 4px;
   background: var(--progress-bg);
   box-shadow: inset 0 1px 1px rgba(0, 0, 0, 0.18);
   transition:
@@ -1038,9 +1042,9 @@
 
 .traffic-stat-value {
   flex: 0 0 auto;
-  font-size: 18px;
-  font-weight: 640;
-  letter-spacing: -0.03em;
+  font-size: 22px;
+  font-weight: 700;
+  letter-spacing: -0.04em;
 }
 
 .traffic-stat-trend {
@@ -1190,9 +1194,9 @@
 .server-health-value,
 .server-card-meta-value {
   flex: 0 0 auto;
-  font-size: 15px;
-  font-weight: 640;
-  letter-spacing: -0.03em;
+  font-size: 18px;
+  font-weight: 700;
+  letter-spacing: -0.04em;
 }
 
 .server-card-meta-value {
