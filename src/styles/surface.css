@@ -977,6 +977,11 @@
   contain: paint;
 }
 
+.metric-track.is-secondary {
+  height: 4px;
+  margin-top: 3px;
+}
+
 .metric-segment {
   flex: 1 1 0;
   min-width: 1px;

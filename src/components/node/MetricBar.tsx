@@ -12,6 +12,8 @@ interface MetricBarProps {
   fraction: number; // 0..1
   /** CSS paint for the filled portion — solid color or linear-gradient. */
   fill: string;
+  secondaryFraction?: number; // 0..1
+  secondaryFill?: string;
 }
 
 export function MetricBar({
@@ -22,6 +24,8 @@ export function MetricBar({
   detailText,
   fraction,
   fill,
+  secondaryFraction,
+  secondaryFill,
 }: MetricBarProps) {
   const clamped = Math.max(0, Math.min(1, fraction));
   const activeSegments = clamped * METRIC_SEGMENT_COUNT;
@@ -47,27 +51,54 @@ export function MetricBar({
       >
         {detailText ?? "\u00A0"}
       </div>
-      <div className="metric-track">
-        {METRIC_SEGMENT_INDICES.map((index) => {
-          const fillLevel = Math.max(0, Math.min(1, activeSegments - index));
-          const isActive = fillLevel > 0;
-          return (
-            <span
-              key={index}
-              className="metric-segment"
-              style={{
-                opacity: isActive ? 0.42 + fillLevel * 0.56 : 0.58,
-                ...(isActive
-                  ? {
-                      background: fill,
-                      backgroundSize: `${METRIC_SEGMENT_COUNT * 100}% 100%`,
-                      backgroundPosition: `${(index / Math.max(1, METRIC_SEGMENT_COUNT - 1)) * 100}% 50%`,
-                    }
-                  : {}),
-              }}
-            />
-          );
-        })}
+      <div className="metric-track-group" style={{ display: "flex", flexDirection: "column" }}>
+        <div className="metric-track">
+          {METRIC_SEGMENT_INDICES.map((index) => {
+            const fillLevel = Math.max(0, Math.min(1, activeSegments - index));
+            const isActive = fillLevel > 0;
+            return (
+              <span
+                key={index}
+                className="metric-segment"
+                style={{
+                  opacity: isActive ? 0.42 + fillLevel * 0.56 : 0.58,
+                  ...(isActive
+                    ? {
+                        background: fill,
+                        backgroundSize: `${METRIC_SEGMENT_COUNT * 100}% 100%`,
+                        backgroundPosition: `${(index / Math.max(1, METRIC_SEGMENT_COUNT - 1)) * 100}% 50%`,
+                      }
+                    : {}),
+                }}
+              />
+            );
+          })}
+        </div>
+        {secondaryFraction !== undefined && secondaryFill && (
+          <div className="metric-track is-secondary">
+            {METRIC_SEGMENT_INDICES.map((index) => {
+              const secondaryActiveSegments = Math.max(0, Math.min(1, secondaryFraction)) * METRIC_SEGMENT_COUNT;
+              const fillLevel = Math.max(0, Math.min(1, secondaryActiveSegments - index));
+              const isActive = fillLevel > 0;
+              return (
+                <span
+                  key={index}
+                  className="metric-segment"
+                  style={{
+                    opacity: isActive ? 0.42 + fillLevel * 0.56 : 0.58,
+                    ...(isActive
+                      ? {
+                          background: secondaryFill,
+                          backgroundSize: `${METRIC_SEGMENT_COUNT * 100}% 100%`,
+                          backgroundPosition: `${(index / Math.max(1, METRIC_SEGMENT_COUNT - 1)) * 100}% 50%`,
+                        }
+                      : {}),
+                  }}
+                />
+              );
+            })}
+          </div>
+        )}
       </div>
     </div>
   );

@@ -260,6 +260,8 @@ export const NodeCard = memo(function NodeCard({
               detailText={`${ramDetail} · S${swapDetail}`}
               fraction={node.ramPct / 100}
               fill="linear-gradient(90deg, color-mix(in srgb, var(--progress-memory) 84%, white 6%) 0%, var(--progress-memory) 100%)"
+              secondaryFraction={node.swapTotal > 0 ? node.swapPct / 100 : undefined}
+              secondaryFill="linear-gradient(90deg, color-mix(in srgb, var(--progress-swap) 84%, white 6%) 0%, var(--progress-swap) 100%)"
             />
             <MetricBar
               icon={<HardDrive size={13} strokeWidth={2} />}
