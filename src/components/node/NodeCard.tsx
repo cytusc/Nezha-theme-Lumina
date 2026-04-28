@@ -6,6 +6,7 @@ import {
   MemoryStick,
   HardDrive,
   Globe,
+  Workflow,
   ArrowDown,
   ArrowUp,
   Clock3,
@@ -134,6 +135,10 @@ export const NodeCard = memo(function NodeCard({
   const loadFraction = Math.max(0, Math.min(1, node.load1 / loadBaseline));
   const upRate = formatTrafficRate(node.netUp);
   const downRate = formatTrafficRate(node.netDown);
+  const swapDetail =
+    node.swapTotal > 0
+      ? `${formatBytes(node.swapUsed)} / ${formatBytes(node.swapTotal)}`
+      : "无";
   const lossHoverColor = hoveredLossBucket ? lossHeatColor(hoveredLossBucket.loss) : null;
   const hasHomepagePingBinding = ping.isAssigned;
 
@@ -212,7 +217,7 @@ export const NodeCard = memo(function NodeCard({
               label="内存"
               valueText={node.ramPct.toFixed(2)}
               unit="%"
-              detailText={`${formatBytes(node.ramUsed)} / ${formatBytes(node.ramTotal)}`}
+              detailText={`${formatBytes(node.ramUsed)} / ${formatBytes(node.ramTotal)} · Swap ${swapDetail}`}
               fraction={node.ramPct / 100}
               fill="linear-gradient(90deg, color-mix(in srgb, var(--progress-memory) 84%, white 6%) 0%, var(--progress-memory) 100%)"
             />
@@ -372,6 +377,12 @@ export const NodeCard = memo(function NodeCard({
               value={uptime.value}
               unit={uptime.unit}
               color="var(--progress-cpu)"
+            />
+            <FooterStat
+              icon={<Workflow size={13} strokeWidth={2} />}
+              label="TCP/UDP"
+              value={`${node.connectionsTcp} / ${node.connectionsUdp}`}
+              color="var(--status-success)"
             />
           </div>
           {footerTags.length > 0 && (
