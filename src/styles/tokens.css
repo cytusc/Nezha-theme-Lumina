@@ -22,8 +22,8 @@
   --hairline: rgba(24, 24, 27, 0.08);
 
   --text-primary: #18181b;
-  --text-secondary: #52525b;
-  --text-tertiary: #71717a;
+  --text-secondary: #3f3f46;
+  --text-tertiary: #52525b;
   --text-on-strong: #ffffff;
 
   --fill-primary: #18181b;
@@ -32,7 +32,7 @@
 
   --hover-bg: #f4f4f5;
 
-  --progress-bg: #e4e4e7;
+  --progress-bg: #d4d4d8;
   --progress-cpu: #3b82f6;
   --progress-memory: #8b5cf6;
   --progress-swap: #6366f1;

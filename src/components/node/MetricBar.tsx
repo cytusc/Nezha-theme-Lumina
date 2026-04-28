@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 
-const METRIC_SEGMENT_COUNT = 18;
+const METRIC_SEGMENT_COUNT = 14;
 const METRIC_SEGMENT_INDICES = Array.from({ length: METRIC_SEGMENT_COUNT }, (_, index) => index);
 
 interface MetricBarProps {

@@ -250,7 +250,7 @@ export const NodeCard = memo(function NodeCard({
               unit="%"
               detailText={`${node.cpu_cores || 0} 核`}
               fraction={node.cpuPct / 100}
-              fill="linear-gradient(90deg, color-mix(in srgb, var(--progress-cpu) 82%, white 8%) 0%, var(--progress-cpu) 100%)"
+              fill="linear-gradient(90deg, color-mix(in srgb, var(--progress-cpu) 82%, white 4%) 0%, var(--progress-cpu) 100%)"
             />
             <MetricBar
               icon={<MemoryStick size={13} strokeWidth={2} />}
@@ -259,9 +259,9 @@ export const NodeCard = memo(function NodeCard({
               unit="%"
               detailText={`${ramDetail} · S${swapDetail}`}
               fraction={node.ramPct / 100}
-              fill="linear-gradient(90deg, color-mix(in srgb, var(--progress-memory) 84%, white 6%) 0%, var(--progress-memory) 100%)"
+              fill="linear-gradient(90deg, color-mix(in srgb, var(--progress-memory) 84%, white 3%) 0%, var(--progress-memory) 100%)"
               secondaryFraction={node.swapTotal > 0 ? node.swapPct / 100 : undefined}
-              secondaryFill="linear-gradient(90deg, color-mix(in srgb, var(--progress-swap) 84%, white 6%) 0%, var(--progress-swap) 100%)"
+              secondaryFill="linear-gradient(90deg, color-mix(in srgb, var(--progress-swap) 84%, white 3%) 0%, var(--progress-swap) 100%)"
             />
             <MetricBar
               icon={<HardDrive size={13} strokeWidth={2} />}
@@ -270,7 +270,7 @@ export const NodeCard = memo(function NodeCard({
               unit="%"
               detailText={diskDetail}
               fraction={node.diskPct / 100}
-              fill="linear-gradient(90deg, color-mix(in srgb, var(--progress-disk) 88%, white 2%) 0%, var(--progress-disk) 100%)"
+              fill="linear-gradient(90deg, color-mix(in srgb, var(--progress-disk) 88%, white 1%) 0%, var(--progress-disk) 100%)"
             />
             <MetricBar
               icon={<Gauge size={13} strokeWidth={2} />}
