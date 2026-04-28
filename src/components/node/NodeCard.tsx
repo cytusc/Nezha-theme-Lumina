@@ -6,7 +6,6 @@ import {
   MemoryStick,
   HardDrive,
   Globe,
-  Workflow,
   ArrowDown,
   ArrowUp,
   Clock3,
@@ -59,15 +58,34 @@ function splitByteLabel(text: string) {
   };
 }
 
+function shortenByteUnit(unit: string) {
+  switch (unit) {
+    case "KB":
+      return "K";
+    case "MB":
+      return "M";
+    case "GB":
+      return "G";
+    case "TB":
+      return "T";
+    case "PB":
+      return "P";
+    default:
+      return unit;
+  }
+}
+
 function formatCompactBytePair(used: number, total: number) {
   const usedLabel = splitByteLabel(formatBytes(used));
   const totalLabel = splitByteLabel(formatBytes(total));
+  const usedUnit = shortenByteUnit(usedLabel.unit);
+  const totalUnit = shortenByteUnit(totalLabel.unit);
 
-  if (usedLabel.unit && usedLabel.unit === totalLabel.unit) {
-    return `${usedLabel.value}/${totalLabel.value} ${usedLabel.unit}`;
+  if (usedUnit && usedUnit === totalUnit) {
+    return `${usedLabel.value}/${totalLabel.value}${usedUnit}`;
   }
 
-  return `${usedLabel.value} ${usedLabel.unit}/${totalLabel.value} ${totalLabel.unit}`.trim();
+  return `${usedLabel.value}${usedUnit}/${totalLabel.value}${totalUnit}`;
 }
 
 function formatBucketWindow(bucket: PingOverviewBucket | null) {
@@ -239,7 +257,7 @@ export const NodeCard = memo(function NodeCard({
               label="内存"
               valueText={node.ramPct.toFixed(2)}
               unit="%"
-              detailText={`${ramDetail} · S ${swapDetail}`}
+              detailText={`${ramDetail} · S${swapDetail}`}
               fraction={node.ramPct / 100}
               fill="linear-gradient(90deg, color-mix(in srgb, var(--progress-memory) 84%, white 6%) 0%, var(--progress-memory) 100%)"
             />
@@ -399,12 +417,6 @@ export const NodeCard = memo(function NodeCard({
               value={uptime.value}
               unit={uptime.unit}
               color="var(--progress-cpu)"
-            />
-            <FooterStat
-              icon={<Workflow size={13} strokeWidth={2} />}
-              label="TCP/UDP"
-              value={`${node.connectionsTcp}/${node.connectionsUdp}`}
-              color="var(--status-success)"
             />
           </div>
           {footerTags.length > 0 && (
