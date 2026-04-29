@@ -270,59 +270,86 @@
   min-width: 0;
   border: 1px solid var(--border-subtle);
   border-radius: 16px;
-  background: color-mix(in srgb, var(--surface-elev) 92%, transparent);
-  padding: 12px 14px;
+  background: color-mix(in srgb, var(--surface-elev) 42%, transparent);
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  transition: border-color 160ms ease, background 160ms ease;
+}
+
+.instance-info-group:hover {
+  border-color: var(--border-strong);
+  background: color-mix(in srgb, var(--surface-elev) 56%, transparent);
 }
 
 .instance-info-group-title {
-  margin-bottom: 10px;
-  color: var(--text-primary);
-  font-size: 12px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--text-secondary);
+  font-size: 10.5px;
   font-weight: 700;
-  letter-spacing: 0.02em;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  margin-bottom: 4px;
+}
+
+.instance-info-content {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
 }
 
 .instance-info-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
   min-width: 0;
-  padding: 9px 0;
-  border-bottom: 1px solid var(--hairline);
-}
-
-.instance-info-item:last-child {
-  border-bottom: 0;
+  padding: 0;
 }
 
 .instance-info-label {
-  display: block;
-  margin-bottom: 4px;
-  color: var(--text-secondary);
-  font-size: 11px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--text-tertiary);
+  font-size: 10px;
   font-weight: 600;
-  letter-spacing: 0.02em;
+  letter-spacing: 0.01em;
 }
 
 .instance-info-value {
   color: var(--text-primary);
-  font-size: 12.5px;
-  font-weight: 600;
-  line-height: 1.45;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  text-align: right;
   word-break: break-word;
 }
 
+.instance-info-item.is-stack {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 8px;
+}
+
 .instance-info-item.is-stack .instance-info-value {
-  margin-bottom: 7px;
+  text-align: left;
 }
 
 .instance-info-traffic {
   display: flex;
   flex-direction: column;
-  gap: 7px;
+  gap: 6px;
 }
 
 .instance-info-note {
   color: var(--text-tertiary);
-  font-size: 11px;
-  font-weight: 500;
+  font-size: 10px;
+  font-weight: 550;
+  letter-spacing: 0.01em;
 }
 
 .instance-overview-item {

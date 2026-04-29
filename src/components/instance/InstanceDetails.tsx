@@ -1,5 +1,25 @@
+import type { ReactNode } from "react";
+import {
+  Activity,
+  Box,
+  Clock,
+  Cpu,
+  Gauge,
+  Globe,
+  HardDrive,
+  Layers,
+  LayoutGrid,
+  MemoryStick,
+  Monitor,
+  Network,
+  RefreshCw,
+} from "lucide-react";
 import { useNode } from "@/hooks/useNode";
-import { formatBytes, formatTrafficRateLabel, formatUptimeDays } from "@/utils/format";
+import {
+  formatBytes,
+  formatTrafficRateLabel,
+  formatUptimeDays,
+} from "@/utils/format";
 import { InstancePanel } from "./InstancePanel";
 
 export function InstanceDetails({ uuid }: { uuid: string }) {
@@ -31,64 +51,124 @@ export function InstanceDetails({ uuid }: { uuid: string }) {
     >
       <div className="instance-info-groups">
         <div className="instance-info-group">
-          <div className="instance-info-group-title">系统</div>
-          <InfoRow label="状态" value={isOnline ? "在线" : "离线"} />
-          <InfoRow
-            label="CPU"
-            value={`${node.cpu_name || "—"}${node.cpu_cores > 0 ? ` (x${node.cpu_cores})` : ""}`}
-          />
-          <InfoRow label="架构" value={node.arch || "—"} />
-          <InfoRow label="虚拟化" value={node.virtualization || "—"} />
-          <InfoRow label="显卡" value={node.gpu_name || "—"} />
-          <InfoRow label="操作系统" value={node.os || "—"} />
+          <div className="instance-info-group-title">
+            <LayoutGrid size={14} strokeWidth={2.5} />
+            <span>系统</span>
+          </div>
+          <div className="instance-info-content">
+            <InfoItem
+              icon={<Activity size={13} strokeWidth={2} />}
+              label="状态"
+              value={isOnline ? "在线" : "离线"}
+              color={isOnline ? "var(--status-online)" : "var(--status-offline)"}
+            />
+            <InfoItem
+              icon={<Cpu size={13} strokeWidth={2} />}
+              label="CPU"
+              value={`${node.cpu_name || "—"}${node.cpu_cores > 0 ? ` (x${node.cpu_cores})` : ""}`}
+            />
+            <InfoItem
+              icon={<Layers size={13} strokeWidth={2} />}
+              label="架构"
+              value={node.arch || "—"}
+            />
+            <InfoItem
+              icon={<Box size={13} strokeWidth={2} />}
+              label="虚拟化"
+              value={node.virtualization || "—"}
+            />
+            <InfoItem
+              icon={<Monitor size={13} strokeWidth={2} />}
+              label="显卡"
+              value={node.gpu_name || "—"}
+            />
+            <InfoItem
+              icon={<Monitor size={13} strokeWidth={2} />}
+              label="操作系统"
+              value={node.os || "—"}
+            />
+          </div>
         </div>
 
         <div className="instance-info-group">
-          <div className="instance-info-group-title">资源</div>
-          <InfoRow label="内存" value={`${formatBytes(node.ramUsed)} / ${formatBytes(node.ramTotal)}`} />
-          <InfoRow
-            label="Swap"
-            value={
-              node.swapTotal > 0
-                ? `${formatBytes(node.swapUsed)} / ${formatBytes(node.swapTotal)}`
-                : "无"
-            }
-          />
-          <InfoRow label="磁盘" value={`${formatBytes(node.diskUsed)} / ${formatBytes(node.diskTotal)}`} />
-          <InfoRow
-            label="负载"
-            value={`${node.load1.toFixed(2)} | ${node.load5.toFixed(2)} | ${node.load15.toFixed(2)}`}
-          />
-          <InfoRow
-            label="运行时长"
-            value={uptime.unit ? `${uptime.value} ${uptime.unit}` : uptime.value}
-          />
+          <div className="instance-info-group-title">
+            <Activity size={14} strokeWidth={2.5} />
+            <span>资源</span>
+          </div>
+          <div className="instance-info-content">
+            <InfoItem
+              icon={<MemoryStick size={13} strokeWidth={2} />}
+              label="内存"
+              value={`${formatBytes(node.ramUsed)} / ${formatBytes(node.ramTotal)}`}
+            />
+            <InfoItem
+              icon={<RefreshCw size={13} strokeWidth={2} />}
+              label="Swap"
+              value={
+                node.swapTotal > 0
+                  ? `${formatBytes(node.swapUsed)} / ${formatBytes(node.swapTotal)}`
+                  : "无"
+              }
+            />
+            <InfoItem
+              icon={<HardDrive size={13} strokeWidth={2} />}
+              label="磁盘"
+              value={`${formatBytes(node.diskUsed)} / ${formatBytes(node.diskTotal)}`}
+            />
+            <InfoItem
+              icon={<Gauge size={13} strokeWidth={2} />}
+              label="负载"
+              value={`${node.load1.toFixed(2)} | ${node.load5.toFixed(2)} | ${node.load15.toFixed(2)}`}
+            />
+            <InfoItem
+              icon={<Clock size={13} strokeWidth={2} />}
+              label="运行时长"
+              value={
+                uptime.unit ? `${uptime.value} ${uptime.unit}` : uptime.value
+              }
+            />
+          </div>
         </div>
 
         <div className="instance-info-group">
-          <div className="instance-info-group-title">网络</div>
-          <InfoRow
-            label={isOnline ? "实时网络" : "缓存网络"}
-            value={`↑ ${formatTrafficRateLabel(node.netUp)} · ↓ ${formatTrafficRateLabel(node.netDown)}`}
-          />
-          <InfoRow label={isOnline ? "最近更新" : "最后上报"} value={lastUpdated} />
-          <div className="instance-info-item is-stack">
-            <span className="instance-info-label">总流量</span>
-            <div className="instance-info-traffic">
-              <span className="instance-info-value">{`↑ ${formatBytes(node.trafficUp)} · ↓ ${formatBytes(node.trafficDown)}`}</span>
-              {node.traffic_limit > 0 && (
-                <>
-                  <div className="instance-progress-track" aria-hidden>
-                    <span
-                      className="instance-progress-fill"
-                      style={{ width: `${trafficFraction * 100}%` }}
-                    />
-                  </div>
-                  <span className="instance-info-note">
-                    {`${formatBytes(trafficUsed)} / ${formatBytes(node.traffic_limit)}`}
-                  </span>
-                </>
-              )}
+          <div className="instance-info-group-title">
+            <Globe size={14} strokeWidth={2.5} />
+            <span>网络</span>
+          </div>
+          <div className="instance-info-content">
+            <InfoItem
+              icon={<Network size={13} strokeWidth={2} />}
+              label={isOnline ? "实时网络" : "缓存网络"}
+              value={`↑ ${formatTrafficRateLabel(node.netUp)} · ↓ ${formatTrafficRateLabel(node.netDown)}`}
+            />
+            <InfoItem
+              icon={<RefreshCw size={13} strokeWidth={2} />}
+              label={isOnline ? "最近更新" : "最后上报"}
+              value={lastUpdated}
+            />
+            <div className="instance-info-item is-stack">
+              <div className="instance-info-label">
+                <Globe size={13} strokeWidth={2} />
+                <span>总流量</span>
+              </div>
+              <div className="instance-info-traffic">
+                <span className="instance-info-value">
+                  {`↑ ${formatBytes(node.trafficUp)} · ↓ ${formatBytes(node.trafficDown)}`}
+                </span>
+                {node.traffic_limit > 0 && (
+                  <>
+                    <div className="instance-progress-track" aria-hidden>
+                      <span
+                        className="instance-progress-fill"
+                        style={{ width: `${trafficFraction * 100}%` }}
+                      />
+                    </div>
+                    <span className="instance-info-note">
+                      {`${formatBytes(trafficUsed)} / ${formatBytes(node.traffic_limit)}`}
+                    </span>
+                  </>
+                )}
+              </div>
             </div>
           </div>
         </div>
@@ -97,17 +177,26 @@ export function InstanceDetails({ uuid }: { uuid: string }) {
   );
 }
 
-function InfoRow({
+function InfoItem({
+  icon,
   label,
   value,
+  color,
 }: {
+  icon: ReactNode;
   label: string;
   value: string;
+  color?: string;
 }) {
   return (
     <div className="instance-info-item">
-      <span className="instance-info-label">{label}</span>
-      <div className="instance-info-value">{value}</div>
+      <div className="instance-info-label">
+        {icon}
+        <span>{label}</span>
+      </div>
+      <div className="instance-info-value" style={{ color }}>
+        {value}
+      </div>
     </div>
   );
 }
