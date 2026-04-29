@@ -23,11 +23,35 @@ import {
 import { InstancePanel } from "./InstancePanel";
 import { Flag } from "@/components/ui/Flag";
 import { clsx } from "clsx";
-import { LogoMark } from "@/components/ui/LogoMark";
 
 const CPU_LOGO_MAP = [
-  { match: ["intel"], src: "/assets/logos/cpu/intel.svg", alt: "Intel" },
-  { match: ["amd", "epyc", "ryzen"], src: "/assets/logos/cpu/amd.svg", alt: "AMD" },
+  {
+    match: ["platinum"],
+    src: "/assets/logos/cpu/intel-inside-2020.svg",
+    alt: "Intel Xeon Platinum",
+  },
+  {
+    match: ["gold"],
+    src: "/assets/logos/cpu/intel-core-i7-2020.svg",
+    alt: "Intel Xeon Gold",
+  },
+  {
+    match: ["silver"],
+    src: "/assets/logos/cpu/intel-inside-2020.svg",
+    alt: "Intel Xeon Silver",
+  },
+  {
+    match: ["xeon", "e5-", "e3-"],
+    src: "/assets/logos/cpu/intel-inside-2020.svg",
+    alt: "Intel Xeon",
+  },
+  { match: ["intel"], src: "/assets/logos/cpu/intel-inside-2020.svg", alt: "Intel Inside" },
+  { match: ["epyc"], src: "/assets/logos/cpu/amd-ryzen-logo.svg", alt: "AMD EPYC" },
+  {
+    match: ["amd", "ryzen", "threadripper"],
+    src: "/assets/logos/cpu/amd-ryzen-logo.svg",
+    alt: "AMD Ryzen",
+  },
 ] as const;
 
 const OS_LOGO_MAP = [
@@ -35,15 +59,35 @@ const OS_LOGO_MAP = [
   { match: ["ubuntu"], src: "/assets/logos/os/ubuntu.svg", alt: "Ubuntu" },
   { match: ["windows"], src: "/assets/logos/os/windows.svg", alt: "Windows" },
   { match: ["centos"], src: "/assets/logos/os/centos.svg", alt: "CentOS" },
-  { match: ["almalinux", "alma"], src: "/assets/logos/os/almalinux.svg", alt: "AlmaLinux" },
-  { match: ["rockylinux", "rocky"], src: "/assets/logos/os/rockylinux.svg", alt: "Rocky Linux" },
-  { match: ["archlinux", "arch"], src: "/assets/logos/os/arch.svg", alt: "Arch Linux" },
+  {
+    match: ["almalinux", "alma"],
+    src: "/assets/logos/os/almalinux.svg",
+    alt: "AlmaLinux",
+  },
+  {
+    match: ["rockylinux", "rocky"],
+    src: "/assets/logos/os/rockylinux.svg",
+    alt: "Rocky Linux",
+  },
+  { match: ["archlinux", "arch"], src: "/assets/logos/os/arch.svg", alt: "Arch" },
   { match: ["fedora"], src: "/assets/logos/os/fedora.svg", alt: "Fedora" },
-  { match: ["opensuse", "open suse", "suse"], src: "/assets/logos/os/opensuse.svg", alt: "openSUSE" },
-  { match: ["alpine", "alpinelinux"], src: "/assets/logos/os/alpine.svg", alt: "Alpine Linux" },
+  {
+    match: ["opensuse", "open suse", "suse"],
+    src: "/assets/logos/os/opensuse.svg",
+    alt: "openSUSE",
+  },
+  {
+    match: ["alpine", "alpinelinux"],
+    src: "/assets/logos/os/alpine.svg",
+    alt: "Alpine",
+  },
   { match: ["freebsd"], src: "/assets/logos/os/freebsd.svg", alt: "FreeBSD" },
   { match: ["openwrt"], src: "/assets/logos/os/openwrt.svg", alt: "OpenWrt" },
-  { match: ["macos", "os x", "darwin", "mac"], src: "/assets/logos/os/apple.svg", alt: "Apple" },
+  {
+    match: ["macos", "os x", "darwin", "mac"],
+    src: "/assets/logos/os/apple.svg",
+    alt: "Apple",
+  },
 ] as const;
 
 export function InstanceDetails({ uuid }: { uuid: string }) {
@@ -123,7 +167,7 @@ export function InstanceDetails({ uuid }: { uuid: string }) {
                 }
               />
               <InfoItem
-                icon={<VendorLogo name={node.cpu_name} />}
+                icon={<Cpu size={13} strokeWidth={2} />}
                 label="处理器"
                 value={`${node.cpu_name || "—"}${node.cpu_cores > 0 ? ` (x${node.cpu_cores})` : ""}`}
               />
@@ -143,10 +187,11 @@ export function InstanceDetails({ uuid }: { uuid: string }) {
                 value={node.gpu_name || "—"}
               />
               <InfoItem
-                icon={<OSLogo name={node.os} />}
+                icon={<Monitor size={13} strokeWidth={2} />}
                 label="操作系统"
                 value={node.os || "—"}
               />
+              <InstanceStickers node={node} />
             </div>
           </div>
 
@@ -238,32 +283,75 @@ export function InstanceDetails({ uuid }: { uuid: string }) {
   );
 }
 
-function resolveLogo<T extends { match: readonly string[] }>(name: string | undefined, entries: readonly T[]) {
+function resolveLogo<T extends { match: readonly string[] }>(
+  name: string | undefined,
+  entries: readonly T[],
+) {
   const value = name?.toLowerCase().trim() ?? "";
   if (!value) return null;
-  return entries.find((entry) => entry.match.some((keyword) => value.includes(keyword))) ?? null;
-}
-
-function VendorLogo({ name }: { name?: string }) {
-  const logo = resolveLogo(name, CPU_LOGO_MAP);
   return (
-    <LogoMark
-      src={logo?.src}
-      alt={logo?.alt ?? "CPU"}
-      fallback={<Cpu size={13} strokeWidth={2} />}
-    />
+    entries.find((entry) =>
+      entry.match.some((keyword) => value.includes(keyword)),
+    ) ?? null
   );
 }
 
-function OSLogo({ name }: { name?: string }) {
-  const logo = resolveLogo(name, OS_LOGO_MAP);
+function InstanceStickers({ node }: { node: any }) {
+  const cpuLogo = resolveLogo(node.cpu_name, CPU_LOGO_MAP);
+  const osLogo = resolveLogo(node.os, OS_LOGO_MAP);
+
+  if (!cpuLogo && !osLogo) return null;
+
+  const cpuName = node.cpu_name || "";
+  const isIntel = cpuName.toLowerCase().includes("intel") || cpuLogo?.alt?.includes("Intel");
+  const isAmd = cpuName.toLowerCase().includes("amd") || cpuName.toLowerCase().includes("epyc") || cpuName.toLowerCase().includes("ryzen") || cpuLogo?.alt?.includes("AMD");
+
   return (
-    <LogoMark
-      src={logo?.src}
-      alt={logo?.alt ?? "操作系统"}
-      fallback={<Monitor size={13} strokeWidth={2} />}
-    />
+    <div className="instance-stickers">
+      {cpuLogo && (
+        <div
+          className={`instance-sticker ${isIntel ? "is-intel" : isAmd ? "is-amd" : ""}`}
+          title={cpuLogo.alt}
+        >
+          <img src={cpuLogo.src} alt={cpuLogo.alt} />
+          <div className="sticker-text">
+            <span className="sticker-brand">{isIntel ? "Intel" : isAmd ? "AMD" : ""}</span>
+            <span className="sticker-model">{extractCpuModel(cpuName)}</span>
+          </div>
+          <div className="sticker-shine" />
+        </div>
+      )}
+      {osLogo && (
+        <div className="instance-sticker" title={osLogo.alt}>
+          <img src={osLogo.src} alt={osLogo.alt} />
+          <div className="sticker-text">
+            <span className="sticker-brand">OS</span>
+            <span className="sticker-model">{osLogo.alt}</span>
+          </div>
+          <div className="sticker-shine" />
+        </div>
+      )}
+    </div>
   );
+}
+
+function extractCpuModel(cpuName: string): string {
+  if (!cpuName) return "";
+  const name = cpuName.trim();
+  const patterns = [
+    /Intel\s+\w+\s+[A-Z]\d+/i,
+    /AMD\s+(EPYC|Ryzen|Threadripper)\s+\S+/i,
+    /Xeon\s+\w*\s*\d*/i,
+    /Core\s+i[3579]/i,
+  ];
+  for (const pattern of patterns) {
+    const match = name.match(pattern);
+    if (match) return match[0];
+  }
+  if (name.length > 25) {
+    return name.substring(0, 22) + "...";
+  }
+  return name;
 }
 
 function InfoItem({

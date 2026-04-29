@@ -1541,3 +1541,111 @@
     gap: 14px;
   }
 }
+
+.instance-stickers {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  margin-top: 12px;
+  padding-top: 18px;
+  border-top: 1px solid var(--hairline);
+  justify-content: flex-start;
+}
+
+.instance-sticker {
+  position: relative;
+  width: 120px;
+  height: 48px;
+  padding: 0;
+  background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+  border-radius: 6px;
+  border: 2px solid;
+  border-color: #c0c0c0 #ffffff #909090 #d0d0d0;
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,0.15),
+    inset 0 -1px 0 rgba(0,0,0,0.3),
+    0 4px 12px rgba(0,0,0,0.3),
+    0 2px 4px rgba(0,0,0,0.2);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 10px;
+  transition: all 0.3s cubic-bezier(0.2, 0.8, 0.2, 1);
+  overflow: hidden;
+  cursor: help;
+  gap: 8px;
+}
+
+.instance-sticker.is-intel {
+  background: linear-gradient(135deg, #0071c5 0%, #00aeef 100%);
+  border-color: #4a9fd8 #87ceeb #005a9c #5bb8e8;
+}
+
+.instance-sticker.is-amd {
+  background: linear-gradient(135deg, #ed1c24 0%, #ff0000 50%, #8b0000 100%);
+  border-color: #ff6b6b #ffb3b3 #a00000 #ff8080;
+}
+
+.instance-sticker:hover {
+  transform: translateY(-4px) scale(1.05);
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,0.2),
+    inset 0 -1px 0 rgba(0,0,0,0.4),
+    0 12px 28px rgba(0,0,0,0.4),
+    0 6px 12px rgba(0,0,0,0.25);
+}
+
+.instance-sticker img {
+  width: 28px;
+  height: 28px;
+  object-fit: contain;
+  filter: drop-shadow(0 1px 2px rgba(0,0,0,0.3));
+  flex-shrink: 0;
+}
+
+.sticker-text {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 1px;
+  min-width: 0;
+}
+
+.sticker-brand {
+  font-size: 9px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: rgba(255,255,255,0.95);
+  text-shadow: 0 1px 2px rgba(0,0,0,0.4);
+  line-height: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.sticker-model {
+  font-size: 10px;
+  font-weight: 600;
+  color: #fff;
+  text-shadow: 0 1px 2px rgba(0,0,0,0.5);
+  line-height: 1.2;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.sticker-shine {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    135deg,
+    rgba(255,255,255,0.25) 0%,
+    rgba(255,255,255,0) 45%,
+    rgba(255,255,255,0) 55%,
+    rgba(255,255,255,0.08) 100%
+  );
+  pointer-events: none;
+  border-radius: 4px;
+}
