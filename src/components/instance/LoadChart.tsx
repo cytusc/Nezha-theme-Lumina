@@ -160,7 +160,6 @@ function useOptions({
   title,
   keys,
   colors,
-  unit,
   height,
   width,
   resolvedAppearance,
@@ -172,7 +171,6 @@ function useOptions({
   title: string;
   keys: string[];
   colors: string[];
-  unit: string;
   height: number;
   width: number;
   resolvedAppearance: "light" | "dark";
@@ -301,7 +299,6 @@ const ChartCard = memo(function ChartCard({
         title,
         keys,
         colors,
-        unit,
         height,
         width,
         resolvedAppearance,

@@ -6,6 +6,7 @@ import logging
 import os
 import threading
 import time
+import http.cookiejar
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
@@ -14,7 +15,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from typing import Any
 from urllib.error import HTTPError, URLError
 from urllib.parse import parse_qs, urlparse
-from urllib.request import Request, urlopen
+from urllib.request import Request, build_opener, HTTPCookieProcessor
 
 from websocket import WebSocketApp
 
@@ -23,6 +24,8 @@ LISTEN_HOST = os.getenv("LUMINA_HOME_API_HOST", "127.0.0.1")
 LISTEN_PORT = int(os.getenv("LUMINA_HOME_API_PORT", "18080"))
 NEZHA_HTTP_BASE = os.getenv("NEZHA_HTTP_BASE", "http://127.0.0.1:8008")
 NEZHA_WS_URL = os.getenv("NEZHA_WS_URL", "ws://127.0.0.1:8008/api/v1/ws/server")
+DASHBOARD_USERNAME = os.getenv("LUMINA_DASHBOARD_USERNAME", "").strip()
+DASHBOARD_PASSWORD = os.getenv("LUMINA_DASHBOARD_PASSWORD", "").strip()
 PING_CACHE_TTL = int(os.getenv("LUMINA_PING_CACHE_TTL", "25"))
 LOAD_CACHE_TTL = int(os.getenv("LUMINA_LOAD_CACHE_TTL", "20"))
 SNAPSHOT_WAIT_TIMEOUT = float(os.getenv("LUMINA_SNAPSHOT_WAIT_TIMEOUT", "2.0"))
@@ -180,11 +183,72 @@ class LuminaHomeService:
         self.ping_lock = threading.Lock()
         self.load_cache: dict[str, LoadCacheEntry] = {}
         self.load_lock = threading.Lock()
+        self.dashboard_username = DASHBOARD_USERNAME
+        self.dashboard_password = DASHBOARD_PASSWORD
+        self.auth_lock = threading.Lock()
+        self.cookie_jar = http.cookiejar.CookieJar()
+        self.opener = self.build_opener()
 
-    def fetch_json(self, path: str) -> Any:
+    def build_opener(self):
+        return build_opener(HTTPCookieProcessor(self.cookie_jar))
+
+    def login_dashboard(self, force: bool = False) -> bool:
+        if not self.dashboard_username or not self.dashboard_password:
+            return False
+
+        with self.auth_lock:
+            if force:
+                self.cookie_jar = http.cookiejar.CookieJar()
+                self.opener = self.build_opener()
+            elif any(cookie.name == "nz-jwt" and cookie.value for cookie in self.cookie_jar):
+                return True
+
+            body = json.dumps({
+                "username": self.dashboard_username,
+                "password": self.dashboard_password,
+            }).encode("utf-8")
+            req = Request(
+                f"{NEZHA_HTTP_BASE}/api/v1/login",
+                data=body,
+                headers={
+                    "Accept": "application/json",
+                    "Content-Type": "application/json",
+                },
+                method="POST",
+            )
+
+            try:
+                with self.opener.open(req, timeout=10) as response:
+                    payload = json.loads(response.read().decode("utf-8"))
+                success = bool(payload.get("success"))
+                has_cookie = any(cookie.name == "nz-jwt" and cookie.value for cookie in self.cookie_jar)
+                if success and has_cookie:
+                    logging.info("dashboard auth ready for lumina sidecar user=%s", self.dashboard_username)
+                    return True
+                logging.warning("dashboard login returned unexpected payload: %s", payload)
+            except Exception:
+                logging.exception("dashboard login failed")
+            return False
+
+    def fetch_json(self, path: str, allow_retry: bool = True) -> Any:
         req = Request(f"{NEZHA_HTTP_BASE}{path}", headers={"Accept": "application/json"})
-        with urlopen(req, timeout=10) as response:
-            return json.loads(response.read().decode("utf-8"))
+        try:
+            with self.opener.open(req, timeout=10) as response:
+                payload = json.loads(response.read().decode("utf-8"))
+        except Exception:
+            if allow_retry and self.login_dashboard(force=True):
+                return self.fetch_json(path, allow_retry=False)
+            raise
+
+        if (
+            allow_retry
+            and isinstance(payload, dict)
+            and isinstance(payload.get("error"), str)
+            and "unauthorized" in payload["error"].lower()
+            and self.login_dashboard(force=True)
+        ):
+            return self.fetch_json(path, allow_retry=False)
+        return payload
 
     def get_snapshot(self) -> dict[str, Any] | None:
         payload, _ = self.snapshot_state.get()

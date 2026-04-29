@@ -44,6 +44,70 @@ npm run build
 
 3. 将 `dist/` 部署到你的哪吒前端静态资源环境，或通过反向代理与哪吒后端 `/api/v1/*` 联通。
 
+### 可选：部署 Lumina 聚合 sidecar（推荐）
+
+如果你需要首页聚合接口，或希望详情页负载历史支持 `7 天 / 30 天` 在“已有多少历史就显示多少历史”的效果，推荐同时部署仓库里的 sidecar：
+
+- 服务文件：`scripts/lumina-home-api.service`
+- Python 脚本：`scripts/lumina_home_api.py`
+
+一个常见部署目录示例：
+
+- 前端静态文件：`/opt/lumina/dist`
+- sidecar 脚本：`/opt/lumina/lumina_home_api.py`
+- systemd 服务：`/etc/systemd/system/lumina-home-api.service`
+
+#### 认证环境文件
+
+为了让 sidecar 以已登录身份读取哪吒 Dashboard 的 `7d / 30d` metrics，建议使用单独的环境文件，而不是把账号密码直接写进 service override。
+
+建议路径：
+
+- `/etc/lumina/lumina-home-api.env`
+
+示例内容可参考：
+
+- `scripts/lumina-home-api.env.example`
+
+服务器上的实际文件建议写成：
+
+```bash
+mkdir -p /etc/lumina
+cat > /etc/lumina/lumina-home-api.env <<'EOF'
+LUMINA_DASHBOARD_USERNAME=lumina_service
+LUMINA_DASHBOARD_PASSWORD=请替换为你的密码
+EOF
+chmod 600 /etc/lumina/lumina-home-api.env
+chown root:root /etc/lumina/lumina-home-api.env
+```
+
+#### systemd override 示例
+
+建议通过 override 引用环境文件：
+
+```bash
+mkdir -p /etc/systemd/system/lumina-home-api.service.d
+cat > /etc/systemd/system/lumina-home-api.service.d/auth.conf <<'EOF'
+[Service]
+EnvironmentFile=/etc/lumina/lumina-home-api.env
+EOF
+```
+
+然后重载并重启：
+
+```bash
+systemctl daemon-reload
+systemctl restart lumina-home-api.service
+systemctl status lumina-home-api.service
+```
+
+#### 安全建议
+
+- 不要把真实账号密码提交到仓库
+- 环境文件权限至少应为 `600`
+- sidecar 建议仅监听本机，例如 `127.0.0.1:18080`
+- 如果未来哪吒支持更细粒度的只读 token，优先改用 token 方案
+
 ## 开发
 
 要求：
