@@ -23,6 +23,28 @@ import {
 import { InstancePanel } from "./InstancePanel";
 import { Flag } from "@/components/ui/Flag";
 import { clsx } from "clsx";
+import { LogoMark } from "@/components/ui/LogoMark";
+
+const CPU_LOGO_MAP = [
+  { match: ["intel"], src: "/assets/logos/cpu/intel.svg", alt: "Intel" },
+  { match: ["amd", "epyc", "ryzen"], src: "/assets/logos/cpu/amd.svg", alt: "AMD" },
+] as const;
+
+const OS_LOGO_MAP = [
+  { match: ["debian"], src: "/assets/logos/os/debian.svg", alt: "Debian" },
+  { match: ["ubuntu"], src: "/assets/logos/os/ubuntu.svg", alt: "Ubuntu" },
+  { match: ["windows"], src: "/assets/logos/os/windows.svg", alt: "Windows" },
+  { match: ["centos"], src: "/assets/logos/os/centos.svg", alt: "CentOS" },
+  { match: ["almalinux", "alma"], src: "/assets/logos/os/almalinux.svg", alt: "AlmaLinux" },
+  { match: ["rockylinux", "rocky"], src: "/assets/logos/os/rockylinux.svg", alt: "Rocky Linux" },
+  { match: ["archlinux", "arch"], src: "/assets/logos/os/arch.svg", alt: "Arch Linux" },
+  { match: ["fedora"], src: "/assets/logos/os/fedora.svg", alt: "Fedora" },
+  { match: ["opensuse", "open suse", "suse"], src: "/assets/logos/os/opensuse.svg", alt: "openSUSE" },
+  { match: ["alpine", "alpinelinux"], src: "/assets/logos/os/alpine.svg", alt: "Alpine Linux" },
+  { match: ["freebsd"], src: "/assets/logos/os/freebsd.svg", alt: "FreeBSD" },
+  { match: ["openwrt"], src: "/assets/logos/os/openwrt.svg", alt: "OpenWrt" },
+  { match: ["macos", "os x", "darwin", "mac"], src: "/assets/logos/os/apple.svg", alt: "Apple" },
+] as const;
 
 export function InstanceDetails({ uuid }: { uuid: string }) {
   const node = useNode(uuid);
@@ -216,56 +238,32 @@ export function InstanceDetails({ uuid }: { uuid: string }) {
   );
 }
 
+function resolveLogo<T extends { match: readonly string[] }>(name: string | undefined, entries: readonly T[]) {
+  const value = name?.toLowerCase().trim() ?? "";
+  if (!value) return null;
+  return entries.find((entry) => entry.match.some((keyword) => value.includes(keyword))) ?? null;
+}
+
 function VendorLogo({ name }: { name?: string }) {
-  const low = name?.toLowerCase() ?? "";
-  if (low.includes("intel")) {
-    return (
-      <svg width="13" height="13" viewBox="0 0 24 24" fill="none">
-        <path
-          d="M2 3h20v18H2V3zm16 14v-2h-2v2h2zm-4 0v-6h-2v6h2zm-4 0v-4H8v4h2z"
-          fill="#0071C5"
-        />
-      </svg>
-    );
-  }
-  if (low.includes("amd")) {
-    return (
-      <svg width="13" height="13" viewBox="0 0 24 24" fill="none">
-        <path d="M22 2L12 12l10 10V2zM2 22L12 12 2 2v20z" fill="#ED1C24" />
-      </svg>
-    );
-  }
-  return <Cpu size={13} strokeWidth={2} />;
+  const logo = resolveLogo(name, CPU_LOGO_MAP);
+  return (
+    <LogoMark
+      src={logo?.src}
+      alt={logo?.alt ?? "CPU"}
+      fallback={<Cpu size={13} strokeWidth={2} />}
+    />
+  );
 }
 
 function OSLogo({ name }: { name?: string }) {
-  const low = name?.toLowerCase() ?? "";
-  if (low.includes("debian")) {
-    return (
-      <svg width="13" height="13" viewBox="0 0 24 24" fill="none">
-        <path
-          d="M12 2c-5.52 0-10 4.48-10 10s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 15c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5z"
-          fill="#D70A53"
-        />
-      </svg>
-    );
-  }
-  if (low.includes("ubuntu")) {
-    return (
-      <svg width="13" height="13" viewBox="0 0 24 24" fill="none">
-        <circle cx="12" cy="12" r="10" fill="#E95420" />
-        <circle cx="12" cy="12" r="4" fill="white" />
-      </svg>
-    );
-  }
-  if (low.includes("windows")) {
-    return (
-      <svg width="13" height="13" viewBox="0 0 24 24" fill="none">
-        <path d="M2 3l9-1.5V11H2V3zm0 18l9 1.5V13H2v6.5zM12 1.5L22 0V11h-10V1.5zM12 22.5L22 24V13H12v9.5z" fill="#0078D7" />
-      </svg>
-    );
-  }
-  return <Monitor size={13} strokeWidth={2} />;
+  const logo = resolveLogo(name, OS_LOGO_MAP);
+  return (
+    <LogoMark
+      src={logo?.src}
+      alt={logo?.alt ?? "操作系统"}
+      fallback={<Monitor size={13} strokeWidth={2} />}
+    />
+  );
 }
 
 function InfoItem({
