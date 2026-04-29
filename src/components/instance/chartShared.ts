@@ -1,5 +1,6 @@
 import { useEffect, useState, type RefObject } from "react";
 import type uPlot from "uplot";
+import { formatTrafficRateLabel } from "@/utils/format";
 
 export interface TimeRangeOption {
   label: string;
@@ -43,14 +44,29 @@ export function toChartSeconds(value: string | number): number {
   return Number.isNaN(parsed) ? 0 : parsed / 1000;
 }
 
-export function formatHourMinuteAxis(_self: uPlot, splits: number[]): string[] {
-  return splits.map((value) => {
-    const date = new Date(value * 1000);
-    return `${date.getHours().toString().padStart(2, "0")}:${date
-      .getMinutes()
-      .toString()
-      .padStart(2, "0")}`;
-  });
+function pad2(value: number) {
+  return value.toString().padStart(2, "0");
+}
+
+function formatTimeAxisLabel(value: number, hours: number, compact: boolean) {
+  const date = new Date(value * 1000);
+  const monthDay = `${pad2(date.getMonth() + 1)}-${pad2(date.getDate())}`;
+  const monthDayCompact = `${date.getMonth() + 1}/${date.getDate()}`;
+  const hourMinute = `${pad2(date.getHours())}:${pad2(date.getMinutes())}`;
+
+  if (hours >= 720) return compact ? monthDayCompact : monthDay;
+  if (hours >= 168) return compact ? monthDay : `${monthDay} ${hourMinute}`;
+  return hourMinute;
+}
+
+export function createTimeAxisValuesFormatter(hours: number, chartWidth?: number) {
+  const compact =
+    typeof chartWidth === "number" && Number.isFinite(chartWidth) && chartWidth > 0
+      ? chartWidth < 420
+      : false;
+  return (_self: uPlot, splits: number[]): string[] => {
+    return splits.map((value) => formatTimeAxisLabel(value, hours, compact));
+  };
 }
 
 export function formatTooltipTime(timestampSeconds: number): string {
@@ -59,6 +75,107 @@ export function formatTooltipTime(timestampSeconds: number): string {
     minute: "2-digit",
     second: "2-digit",
   });
+}
+
+export type ChartAxisKind = "default" | "percent" | "network" | "count";
+
+export interface ChartAxisConfig {
+  kind?: ChartAxisKind;
+  unit?: string;
+  minSize?: number;
+  hideZero?: boolean;
+}
+
+export interface ChartValueRange {
+  min: number;
+  max: number;
+}
+
+export function estimateAxisTextSize(label: string, minSize = 54) {
+  return Math.max(minSize, label.length * 8 + 10);
+}
+
+function resolveAxisConfig(config?: ChartAxisConfig) {
+  return {
+    kind: config?.kind ?? "default",
+    unit: config?.unit ?? "",
+    minSize: config?.minSize ?? 54,
+    hideZero: config?.hideZero ?? config?.kind !== "percent",
+  } as const;
+}
+
+function formatPercentAxisValue(value: number, min: number, max: number) {
+  const span = Math.abs(max - min);
+  if (span < 0.5) return `${value.toFixed(2)}%`;
+  if (span < 5) return `${value.toFixed(1)}%`;
+  return `${Math.round(value)}%`;
+}
+
+function formatNetworkAxisValue(value: number) {
+  if (!Number.isFinite(value) || value <= 0) return "";
+  return formatTrafficRateLabel(value);
+}
+
+function formatCountAxisValue(value: number, min: number, max: number) {
+  const span = Math.abs(max - min);
+  if (span < 10) return value.toFixed(1);
+  return `${Math.round(value)}`;
+}
+
+export function formatChartAxisValue(
+  value: number,
+  range: ChartValueRange,
+  config?: ChartAxisConfig,
+) {
+  const resolved = resolveAxisConfig(config);
+  if (!Number.isFinite(value)) return "";
+  if (resolved.hideZero && value === 0) return "";
+  if (resolved.kind === "network") return formatNetworkAxisValue(value);
+  if (resolved.kind === "percent") return formatPercentAxisValue(value, range.min, range.max);
+  if (resolved.kind === "count") return formatCountAxisValue(value, range.min, range.max);
+  return `${Math.round(value)}${resolved.unit}`;
+}
+
+export function formatChartTooltipValue(
+  value: number | null | undefined,
+  range: ChartValueRange,
+  config?: ChartAxisConfig,
+) {
+  if (value == null || !Number.isFinite(value)) return "—";
+  return formatChartAxisValue(value, range, {
+    ...config,
+    hideZero: false,
+  });
+}
+
+export function createChartAxisValuesFormatter(config?: ChartAxisConfig) {
+  return (_self: uPlot, splits: number[]) => {
+    const min = Number(_self.scales.y.min ?? 0);
+    const max = Number(_self.scales.y.max ?? 0);
+    return splits.map((value) => formatChartAxisValue(value, { min, max }, config));
+  };
+}
+
+export function getChartValueRange(values: Array<number | null | undefined>): ChartValueRange | null {
+  const numericValues = values.filter(
+    (value): value is number => typeof value === "number" && Number.isFinite(value),
+  );
+  if (numericValues.length === 0) return null;
+  return {
+    min: Math.min(...numericValues),
+    max: Math.max(...numericValues),
+  };
+}
+
+export function estimateChartAxisSize(
+  values: Array<number | null | undefined>,
+  config?: ChartAxisConfig,
+) {
+  const resolved = resolveAxisConfig(config);
+  const range = getChartValueRange(values);
+  if (!range) return resolved.minSize;
+  const label = formatChartAxisValue(range.max, range, { ...resolved, hideZero: false });
+  return estimateAxisTextSize(label, resolved.minSize);
 }
 
 function clamp(value: number, min: number, max: number) {

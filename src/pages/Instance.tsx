@@ -5,21 +5,16 @@ import { InstanceDetails } from "@/components/instance/InstanceDetails";
 import { PingChart } from "@/components/instance/PingChart";
 import { LoadChart } from "@/components/instance/LoadChart";
 import { buildLoadTimeRangeOptions } from "@/components/instance/chartShared";
-import { useAuth } from "@/hooks/useAuth";
 import { prefetchLoadRecords, prefetchPingRecords } from "@/hooks/useRecords";
 
 const FIXED_PING_HOURS = 24;
-const GUEST_LOAD_HISTORY_HOURS = 24;
-const MEMBER_LOAD_HISTORY_HOURS = 720;
+const LOAD_HISTORY_HOURS = 720;
 
 export function Instance() {
   const { uuid } = useParams<{ uuid: string }>();
-  const { data: me } = useAuth();
   const [chartType, setChartType] = useState<"load" | "ping">("load");
   const [loadHours, setLoadHours] = useState(0);
-  const maxLoadHistoryHours = me?.logged_in
-    ? MEMBER_LOAD_HISTORY_HOURS
-    : GUEST_LOAD_HISTORY_HOURS;
+  const maxLoadHistoryHours = LOAD_HISTORY_HOURS;
 
   const loadRanges = useMemo(
     () => buildLoadTimeRangeOptions(maxLoadHistoryHours),

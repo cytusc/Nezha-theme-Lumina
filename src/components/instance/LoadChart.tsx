@@ -7,10 +7,15 @@ import { useLoadRecords } from "@/hooks/useRecords";
 import { useNode } from "@/hooks/useNode";
 import { InstancePanel } from "./InstancePanel";
 import {
-  formatHourMinuteAxis,
+  createChartAxisValuesFormatter,
+  createTimeAxisValuesFormatter,
+  formatChartTooltipValue,
   formatTooltipTime,
+  getChartValueRange,
   getChartTooltipPosition,
+  estimateChartAxisSize,
   toChartSeconds,
+  type ChartAxisConfig,
   useResponsiveChartSize,
 } from "./chartShared";
 import {
@@ -28,7 +33,6 @@ const CHART_COLORS = {
   warning: "#d4a54a",
 } as const;
 
-const LOAD_HISTORY_SAMPLE_LIMIT = 360;
 const REALTIME_HISTORY_SEED_LIMIT = 120;
 const REALTIME_SAMPLE_LIMIT = 600;
 
@@ -44,6 +48,9 @@ const CONNECTION_KEYS = ["connections", "udp"];
 const CONNECTION_COLORS = [CHART_COLORS.memory, CHART_COLORS.cpu];
 const PROCESS_KEYS = ["process"];
 const PROCESS_COLORS = [CHART_COLORS.warning];
+const PERCENT_AXIS_CONFIG = { kind: "percent" } satisfies ChartAxisConfig;
+const NETWORK_AXIS_CONFIG = { kind: "network" } satisfies ChartAxisConfig;
+const COUNT_AXIS_CONFIG = { kind: "count" } satisfies ChartAxisConfig;
 const LOAD_INTERPOLATE_KEYS = [
   "cpu",
   "ram",
@@ -71,6 +78,62 @@ interface TooltipState {
   time: string;
 }
 
+function downsampleChartPoints(
+  points: ChartPoint[],
+  keys: string[],
+  chartWidth: number,
+) {
+  const targetSamples = Math.max(180, Math.floor(chartWidth * 1.5));
+  if (points.length <= targetSamples || keys.length === 0) return points;
+
+  const maxPointsPerBucket = Math.max(2, 2 + keys.length * 2);
+  const bucketCount = Math.max(1, Math.floor(targetSamples / maxPointsPerBucket));
+  const bucketSize = Math.max(1, Math.ceil(points.length / bucketCount));
+  const downsampled: ChartPoint[] = [];
+
+  for (let start = 0; start < points.length; start += bucketSize) {
+    const bucket = points.slice(start, Math.min(points.length, start + bucketSize));
+    if (bucket.length === 0) continue;
+
+    const selected = new Map<number, ChartPoint>();
+    const first = bucket[0];
+    const last = bucket[bucket.length - 1];
+    selected.set(first.time, first);
+    selected.set(last.time, last);
+
+    for (const key of keys) {
+      let minPoint: ChartPoint | null = null;
+      let maxPoint: ChartPoint | null = null;
+      let minValue = Number.POSITIVE_INFINITY;
+      let maxValue = Number.NEGATIVE_INFINITY;
+
+      for (const point of bucket) {
+        const rawValue = point[key];
+        if (typeof rawValue !== "number" || !Number.isFinite(rawValue)) continue;
+        if (rawValue <= minValue) {
+          minValue = rawValue;
+          minPoint = point;
+        }
+        if (rawValue >= maxValue) {
+          maxValue = rawValue;
+          maxPoint = point;
+        }
+      }
+
+      if (minPoint) selected.set(minPoint.time, minPoint);
+      if (maxPoint) selected.set(maxPoint.time, maxPoint);
+    }
+
+    const ordered = [...selected.values()].sort((left, right) => left.time - right.time);
+    for (const point of ordered) {
+      if (downsampled[downsampled.length - 1]?.time === point.time) continue;
+      downsampled.push(point);
+    }
+  }
+
+  return downsampled.length >= 2 ? downsampled : points;
+}
+
 function metricData(points: ChartPoint[], keys: string[]): uPlot.AlignedData {
   const times = points.map((point) => point.time);
   return [times, ...keys.map((key) => points.map((point) => point[key] ?? null))] as uPlot.AlignedData;
@@ -93,32 +156,6 @@ function pointFromNode(node: NonNullable<ReturnType<typeof useNode>>): ChartPoin
   };
 }
 
-function formatTooltipValue(key: string, value: number | null | undefined, unit: string) {
-  if (value == null || !Number.isFinite(value)) return "—";
-  if (key === "netIn" || key === "netOut") return formatTrafficRateLabel(value);
-  if (unit === "%") return `${value.toFixed(2)}%`;
-  if (key === "process" || key === "connections" || key === "udp") return `${Math.round(value)}`;
-  return value.toFixed(2);
-}
-
-function formatPercentAxisValue(value: number, min: number, max: number) {
-  const span = Math.abs(max - min);
-  if (span < 0.5) return `${value.toFixed(2)}%`;
-  if (span < 5) return `${value.toFixed(1)}%`;
-  return `${Math.round(value)}%`;
-}
-
-function formatNetworkAxisValue(value: number) {
-  if (!Number.isFinite(value) || value <= 0) return "";
-  return formatTrafficRateLabel(value);
-}
-
-function formatCountAxisValue(value: number, min: number, max: number) {
-  const span = Math.abs(max - min);
-  if (span < 10) return value.toFixed(1);
-  return `${Math.round(value)}`;
-}
-
 function useOptions({
   title,
   keys,
@@ -128,7 +165,8 @@ function useOptions({
   width,
   resolvedAppearance,
   spanGaps,
-  axisKind = "default",
+  axisConfig,
+  timeAxisFormatter,
   axisSize = 52,
 }: {
   title: string;
@@ -139,7 +177,8 @@ function useOptions({
   width: number;
   resolvedAppearance: "light" | "dark";
   spanGaps?: boolean;
-  axisKind?: "default" | "percent" | "network" | "count";
+  axisConfig?: ChartAxisConfig;
+  timeAxisFormatter: (_self: uPlot, splits: number[]) => string[];
   axisSize?: number;
 }): uPlot.Options {
   const isDark = resolvedAppearance === "dark";
@@ -159,24 +198,14 @@ function useOptions({
         grid: { stroke: grid, width: 1 },
         ticks: { stroke: grid },
         size: 34,
-        values: formatHourMinuteAxis,
+        values: timeAxisFormatter,
       },
       {
         stroke: text,
         grid: { stroke: grid, width: 1 },
         ticks: { stroke: grid },
         size: axisSize,
-        values: (self, splits) => {
-          const min = Number(self.scales.y.min ?? 0);
-          const max = Number(self.scales.y.max ?? 0);
-          return splits.map((value) => {
-            if (value === 0 && axisKind !== "percent") return "";
-            if (axisKind === "network") return formatNetworkAxisValue(value);
-            if (axisKind === "percent") return formatPercentAxisValue(value, min, max);
-            if (axisKind === "count") return formatCountAxisValue(value, min, max);
-            return value === 0 ? "" : `${Math.round(value)}${unit}`;
-          });
-        },
+        values: createChartAxisValuesFormatter(axisConfig),
       },
     ],
     series: [
@@ -213,7 +242,8 @@ const ChartCard = memo(function ChartCard({
   resolvedAppearance,
   unit = "",
   spanGaps,
-  axisKind,
+  axisConfig,
+  timeAxisFormatter,
   axisSize,
 }: {
   icon: ReactNode;
@@ -228,7 +258,8 @@ const ChartCard = memo(function ChartCard({
   resolvedAppearance: "light" | "dark";
   unit?: string;
   spanGaps?: boolean;
-  axisKind?: "default" | "percent" | "network" | "count";
+  axisConfig?: ChartAxisConfig;
+  timeAxisFormatter: (_self: uPlot, splits: number[]) => string[];
   axisSize?: number;
 }) {
   const dataRef = useRef<uPlot.AlignedData>([[]]);
@@ -239,10 +270,31 @@ const ChartCard = memo(function ChartCard({
     rows: [],
     time: "",
   });
-  const data = useMemo(() => metricData(points, keys), [points, keys]);
+  const sampledPoints = useMemo(
+    () => downsampleChartPoints(points, keys, width),
+    [keys, points, width],
+  );
+  const data = useMemo(() => metricData(sampledPoints, keys), [sampledPoints, keys]);
   useEffect(() => {
     dataRef.current = data;
   }, [data]);
+  const effectiveAxisConfig = useMemo(
+    () => axisConfig ?? (unit ? { unit } satisfies ChartAxisConfig : undefined),
+    [axisConfig, unit],
+  );
+  const valueRange = useMemo(
+    () => getChartValueRange(data.slice(1).flatMap((series) => series as Array<number | null | undefined>)),
+    [data],
+  );
+  const resolvedAxisSize = useMemo(
+    () =>
+      axisSize ??
+      estimateChartAxisSize(
+        data.slice(1).flatMap((series) => series as Array<number | null | undefined>),
+        effectiveAxisConfig,
+      ),
+    [axisSize, data, effectiveAxisConfig],
+  );
   const options = useMemo(
     () =>
       useOptions({
@@ -254,10 +306,11 @@ const ChartCard = memo(function ChartCard({
         width,
         resolvedAppearance,
         spanGaps,
-        axisKind,
-        axisSize,
+        axisConfig: effectiveAxisConfig,
+        timeAxisFormatter,
+        axisSize: resolvedAxisSize,
       }),
-    [axisKind, axisSize, colors, height, keys, resolvedAppearance, spanGaps, title, unit, width],
+    [colors, effectiveAxisConfig, height, keys, resolvedAppearance, resolvedAxisSize, spanGaps, timeAxisFormatter, title, unit, width],
   );
 
   const enhancedOptions = useMemo<uPlot.Options>(() => ({
@@ -289,7 +342,7 @@ const ChartCard = memo(function ChartCard({
             const value = currentData[keyIndex + 1]?.[idx] as number | null | undefined;
             return {
               label: key,
-              value: formatTooltipValue(key, value, unit),
+              value: valueRange ? formatChartTooltipValue(value, valueRange, effectiveAxisConfig) : "—",
               color: colors[keyIndex] ?? colors[0],
             };
           });
@@ -314,7 +367,7 @@ const ChartCard = memo(function ChartCard({
         },
       ],
     },
-  }), [colors, keys, options, unit]);
+  }), [colors, effectiveAxisConfig, keys, options, valueRange]);
 
   return (
     <div className="instance-chart-card">
@@ -365,6 +418,10 @@ export function LoadChart({
   const { data, isLoading } = useLoadRecords(uuid, queryHours, active && Boolean(node));
   const { resolvedAppearance } = usePreferences();
   const { w, h } = useResponsiveChartSize("grid");
+  const timeAxisFormatter = useMemo(
+    () => createTimeAxisValuesFormatter(queryHours, w),
+    [queryHours, w],
+  );
   const [realtimePoints, setRealtimePoints] = useState<ChartPoint[]>([]);
   const [connectNulls, setConnectNulls] = useState(false);
   const waitingForNode = active && !node;
@@ -401,8 +458,7 @@ export function LoadChart({
         load: record.load,
       }))
       .filter((point) => point.time > 0)
-      .sort((a, b) => a.time - b.time)
-      .slice(-LOAD_HISTORY_SAMPLE_LIMIT);
+      .sort((a, b) => a.time - b.time);
     const filled = fillMissingMetricPoints(rawPoints);
     return interpolateMetricGaps(filled, LOAD_INTERPOLATE_KEYS);
   }, [data]);
@@ -469,7 +525,8 @@ export function LoadChart({
           resolvedAppearance={resolvedAppearance}
           unit="%"
           spanGaps={connectNulls}
-          axisKind="percent"
+          axisConfig={PERCENT_AXIS_CONFIG}
+          timeAxisFormatter={timeAxisFormatter}
         />
         <ChartCard
           icon={<MemoryStick size={13} />}
@@ -498,7 +555,8 @@ export function LoadChart({
           resolvedAppearance={resolvedAppearance}
           unit="%"
           spanGaps={connectNulls}
-          axisKind="percent"
+          axisConfig={PERCENT_AXIS_CONFIG}
+          timeAxisFormatter={timeAxisFormatter}
         />
         <ChartCard
           icon={<HardDrive size={13} />}
@@ -519,7 +577,8 @@ export function LoadChart({
           resolvedAppearance={resolvedAppearance}
           unit="%"
           spanGaps={connectNulls}
-          axisKind="percent"
+          axisConfig={PERCENT_AXIS_CONFIG}
+          timeAxisFormatter={timeAxisFormatter}
         />
         <ChartCard
           icon={<Network size={13} />}
@@ -544,8 +603,8 @@ export function LoadChart({
           height={h}
           resolvedAppearance={resolvedAppearance}
           spanGaps={connectNulls}
-          axisKind="network"
-          axisSize={78}
+          axisConfig={NETWORK_AXIS_CONFIG}
+          timeAxisFormatter={timeAxisFormatter}
         />
         <ChartCard
           icon={<Workflow size={13} />}
@@ -565,7 +624,8 @@ export function LoadChart({
           height={h}
           resolvedAppearance={resolvedAppearance}
           spanGaps={connectNulls}
-          axisKind="count"
+          axisConfig={COUNT_AXIS_CONFIG}
+          timeAxisFormatter={timeAxisFormatter}
         />
         <ChartCard
           icon={<Gauge size={13} />}
@@ -591,7 +651,8 @@ export function LoadChart({
           height={h}
           resolvedAppearance={resolvedAppearance}
           spanGaps={connectNulls}
-          axisKind="count"
+          axisConfig={COUNT_AXIS_CONFIG}
+          timeAxisFormatter={timeAxisFormatter}
         />
       </div>
     </InstancePanel>

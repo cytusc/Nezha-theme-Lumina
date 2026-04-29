@@ -6,10 +6,14 @@ import { Eye, EyeOff, RefreshCw } from "lucide-react";
 import { usePingRecords } from "@/hooks/useRecords";
 import { InstancePanel } from "./InstancePanel";
 import {
-  formatHourMinuteAxis,
+  createChartAxisValuesFormatter,
+  createTimeAxisValuesFormatter,
+  formatChartTooltipValue,
   formatTooltipTime,
   getChartTooltipPosition,
+  estimateChartAxisSize,
   toChartSeconds,
+  type ChartAxisConfig,
   useResponsiveChartSize,
 } from "./chartShared";
 import {
@@ -29,6 +33,11 @@ interface TooltipState {
   rows: Array<{ label: string; value: string; color: string }>;
   time: string;
 }
+
+const PING_AXIS_CONFIG = {
+  kind: "default",
+  unit: " ms",
+} satisfies ChartAxisConfig;
 
 function colorForTask(index: number) {
   const colors = [
@@ -65,6 +74,10 @@ export function PingChart({
   const { resolvedAppearance } = usePreferences();
   const chartWrapRef = useRef<HTMLDivElement | null>(null);
   const { w, h } = useResponsiveChartSize("wide", chartWrapRef);
+  const timeAxisFormatter = useMemo(
+    () => createTimeAxisValuesFormatter(hours, w),
+    [hours, w],
+  );
   const [hiddenTasks, setHiddenTasks] = useState<Set<number>>(new Set());
   const [connectNulls, setConnectNulls] = useState(false);
   const [cutPeak, setCutPeak] = useState(false);
@@ -180,15 +193,25 @@ export function PingChart({
     if (chart) chartRef.current = chart;
   }, [chart]);
 
+  const visibleValues = useMemo(
+    () =>
+      chart
+        ? tasks
+            .flatMap((task, index) =>
+              visibleTaskIds.has(task.id)
+                ? ((chart[index + 1] as Array<number | null | undefined>) ?? [])
+                : [],
+            )
+            .filter(
+              (value): value is number =>
+                typeof value === "number" && Number.isFinite(value) && value > 0,
+            )
+        : [],
+    [chart, tasks, visibleTaskIds],
+  );
+
   const yRange = useMemo<[number | null, number | null]>(() => {
-    if (!chart) return [null, null];
-    const values = tasks
-      .flatMap((task, index) =>
-        visibleTaskIds.has(task.id)
-          ? ((chart[index + 1] as Array<number | null | undefined>) ?? [])
-          : [],
-      )
-      .filter((value): value is number => typeof value === "number" && Number.isFinite(value) && value > 0);
+    const values = visibleValues;
     if (values.length === 0) return [0, 100];
     const min = Math.min(...values);
     const max = Math.max(...values);
@@ -198,7 +221,9 @@ export function PingChart({
     }
     const pad = Math.max(5, (max - min) * 0.12);
     return [Math.max(0, min - pad), max + pad];
-  }, [chart, tasks, visibleTaskIds]);
+  }, [visibleValues]);
+
+  const yAxisSize = useMemo(() => estimateChartAxisSize(visibleValues, PING_AXIS_CONFIG), [visibleValues]);
 
   const options = useMemo<uPlot.Options | null>(() => {
     if (!chart) return null;
@@ -220,14 +245,14 @@ export function PingChart({
           grid: { stroke: grid, width: 1 },
           ticks: { stroke: grid },
           size: 36,
-          values: formatHourMinuteAxis,
+          values: timeAxisFormatter,
         },
         {
           stroke: text,
           grid: { stroke: grid, width: 1 },
           ticks: { stroke: grid },
-          size: 54,
-          values: (_self, splits) => splits.map((value) => (value === 0 ? "" : `${Math.round(value)} ms`)),
+          size: yAxisSize,
+          values: createChartAxisValuesFormatter(PING_AXIS_CONFIG),
         },
       ],
       series: [
@@ -269,7 +294,7 @@ export function PingChart({
               const value = currentChart[taskIndex + 1]?.[idx] as number | null | undefined;
               return {
                 label: taskLabels.get(task.id) ?? `任务 #${task.id}`,
-                value: value == null ? "—" : `${value.toFixed(1)} ms`,
+                value: formatChartTooltipValue(value, { min: yRange[0] ?? 0, max: yRange[1] ?? 0 }, PING_AXIS_CONFIG),
                 color: taskColors.get(task.id) ?? colorForTask(taskIndex),
               };
             });
@@ -293,7 +318,7 @@ export function PingChart({
         ],
       },
     };
-  }, [chart, connectNulls, h, hiddenTasks, isDark, taskColors, taskIndexById, taskLabels, tasks, visibleTasks, w, yRange]);
+  }, [chart, connectNulls, h, hiddenTasks, isDark, taskColors, taskIndexById, taskLabels, tasks, timeAxisFormatter, visibleTasks, w, yAxisSize, yRange]);
 
   const taskStats = useMemo(() => {
     const grouped = new Map<number, PingRecord[]>();
