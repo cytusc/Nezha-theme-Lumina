@@ -83,10 +83,14 @@ export function createRetryInterceptor(
 
     await new Promise((resolve) => setTimeout(resolve, Math.pow(2, attempt) * 1000));
 
+    const existingDetails = typeof error.details === "object" && error.details !== null
+      ? (error.details as Record<string, unknown>)
+      : {};
+
     return {
       ...error,
       details: {
-        ...error.details,
+        ...existingDetails,
         __retryAttempt: attempt + 1,
         __shouldRetry: true,
       },

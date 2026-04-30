@@ -1,5 +1,6 @@
 import type { NodeDisplay, TrafficTrendSample } from "@/types/monitor";
 import { apiGateway } from "@/services/api";
+import type { NezhaStreamServer } from "@/services/api";
 
 type Listener = () => void;
 
@@ -297,7 +298,7 @@ function commit(next: State, touched: Iterable<string>) {
 function applyStreamSnapshot(payload: ReturnType<typeof apiGateway.parseServerStreamPayload>) {
   const nowMs = toTimestamp(payload.now);
   const displays = sortDisplays(
-    payload.servers.map((server) => apiGateway.mapStreamServerToNodeDisplay(server, nowMs)),
+    payload.servers.map((server: NezhaStreamServer) => apiGateway.mapStreamServerToNodeDisplay(server, nowMs)),
   );
   const nextByUuid: Record<string, NodeDisplay> = {};
   const nextTrafficTrends: Record<string, NodeTrafficTrend> = {};

@@ -20,7 +20,7 @@ export function createLoggingInterceptor(): (
       params: config.params,
     };
 
-    (config as Record<string, unknown>).__logEntry = logEntry;
+    (config as unknown as Record<string, unknown>).__logEntry = logEntry;
 
     apiLogger.debug("API Request", {
       requestId: logEntry.id,

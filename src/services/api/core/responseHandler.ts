@@ -6,7 +6,7 @@ export function createLoggingResponseInterceptor(): (
   response: ApiResponse,
 ) => ApiResponse | Promise<ApiResponse> {
   return (response: ApiResponse): ApiResponse => {
-    const logEntry = (response as Record<string, unknown>).__logEntry as
+    const logEntry = (response as unknown as Record<string, unknown>).__logEntry as
       | RequestLogEntry
       | undefined;
 

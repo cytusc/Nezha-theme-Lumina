@@ -2,7 +2,6 @@ import type {
   ApiError,
   ApiRequestConfig,
   ApiResponse,
-  RequestLogEntry,
 } from "../types";
 
 const DEFAULT_TIMEOUT_MS = 30_000;
@@ -104,7 +103,7 @@ export class HttpClient {
       };
 
       for (const interceptor of this.responseInterceptors) {
-        apiResponse = await interceptor(apiResponse);
+        apiResponse = (await interceptor(apiResponse as ApiResponse<unknown>)) as ApiResponse<T>;
       }
 
       return apiResponse;

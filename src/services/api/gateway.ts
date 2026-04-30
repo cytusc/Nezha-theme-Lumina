@@ -4,10 +4,9 @@ import { createLoggingInterceptor, createTimeoutInterceptor } from "./core/reque
 import { createLoggingResponseInterceptor, createSuccessValidatorInterceptor } from "./core/responseHandler";
 import { createErrorLoggingInterceptor } from "./core/errorHandler";
 import { apiLogger } from "./monitoring/apiLogger";
-import { nezhaAdapter } from "./adapters/nezhaAdapter";
+import { nezhaAdapter, type HomeBootstrapPayload } from "./adapters/nezhaAdapter";
 import { z } from "zod";
 import type {
-  HomeBootstrapPayload,
   LoadRecordsResponse,
   Me,
   NodeDisplay,

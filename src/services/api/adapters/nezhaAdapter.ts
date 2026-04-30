@@ -1,15 +1,15 @@
 import { z } from "zod";
 import { httpClient } from "../core/httpClient";
 import { apiLogger } from "../monitoring/apiLogger";
-import type {
+import {
   LoadRecordSchema,
-  LoadRecordsResponse,
-  Me,
-  NodeDisplay,
-  PingOverviewItem,
-  PingRecordsResponse,
-  PingTask,
-  Version,
+  type LoadRecordsResponse,
+  type Me,
+  type NodeDisplay,
+  type PingOverviewItem,
+  type PingRecordsResponse,
+  type PingTask,
+  type Version,
 } from "@/types/monitor";
 
 const ApiEnvelope = <T extends z.ZodTypeAny>(inner: T) =>
@@ -707,16 +707,6 @@ class NezhaApiAdapter {
     const period = hoursToPeriod(hours);
     const services = await this.getServerServices(serverId, period);
     const intervalSeconds = period === "30d" ? 7200 : period === "7d" ? 1800 : 30;
-
-    function selectPrimaryService(services: NezhaServiceInfo[]) {
-      if (services.length === 0) return null;
-      return [...services].sort((left, right) => {
-        if (left.display_index !== right.display_index) {
-          return right.display_index - left.display_index;
-        }
-        return left.monitor_id - right.monitor_id;
-      })[0] ?? null;
-    }
 
     function buildPingRecordsFromService(service: NezhaServiceInfo) {
       const size = Math.min(service.created_at.length, service.avg_delay.length);

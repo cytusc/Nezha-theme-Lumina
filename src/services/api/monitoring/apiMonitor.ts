@@ -21,7 +21,7 @@ class ApiMonitor {
     const record: RequestRecord = {
       id: entry.id ?? "",
       timestamp: entry.timestamp ?? Date.now(),
-      path: entry.path,
+      path: entry.path ?? "",
       method: entry.method ?? "GET",
       status: entry.status ?? 0,
       duration: entry.duration ?? 0,
@@ -191,11 +191,12 @@ class ApiMonitor {
   }
 
   subscribeToEndpoint(
-    endpoint: string,
+    _endpoint: string,
     listener: (metrics: EndpointMetrics) => void,
   ): () => void {
-    this.updateListeners.add(listener);
-    return () => this.updateListeners.delete(listener);
+    const wrappedListener = (_ep: string, metrics: EndpointMetrics) => listener(metrics);
+    this.updateListeners.add(wrappedListener);
+    return () => this.updateListeners.delete(wrappedListener);
   }
 
   private notifyGlobalListeners(): void {

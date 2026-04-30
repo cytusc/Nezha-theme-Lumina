@@ -11,15 +11,6 @@ import {
   type Version,
 } from "@/types/monitor";
 
-const ApiEnvelope = <T extends z.ZodTypeAny>(inner: T) =>
-  z
-    .object({
-      success: z.boolean().default(true),
-      data: inner.optional(),
-      error: z.string().optional(),
-    })
-    .passthrough();
-
 const NezhaHostSchema = z
   .object({
     platform: z.string().default(""),
@@ -793,3 +784,7 @@ export async function getPrimaryServiceOverview(uuid: string): Promise<PingOverv
     loss: values.length > 0 ? (lost / values.length) * 100 : null,
   };
 }
+
+export { apiGateway } from "./api/gateway";
+export { apiMonitor } from "./api/monitoring/apiMonitor";
+export { apiLogger } from "./api/monitoring/apiLogger";
