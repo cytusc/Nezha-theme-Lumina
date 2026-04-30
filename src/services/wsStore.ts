@@ -1,10 +1,5 @@
 import type { NodeDisplay, TrafficTrendSample } from "@/types/monitor";
-import {
-  getServerStreamUrl,
-  mapStreamServerToNodeDisplay,
-  parseServerStreamPayload,
-  rememberNodeDisplay,
-} from "@/services/api";
+import { apiGateway } from "@/services/api";
 
 type Listener = () => void;
 
@@ -41,8 +36,6 @@ interface NodeTrafficTrend {
 }
 
 const TRAFFIC_TREND_SAMPLE_COUNT = 18;
-const WS_RECONNECT_BASE_DELAY_MS = 2_000;
-const WS_RECONNECT_MAX_DELAY_MS = 30_000;
 const EMPTY_TRAFFIC_TREND_SAMPLE: TrafficTrendSample = {
   value: 0,
   level: 0.25,
@@ -117,7 +110,7 @@ function shallowEqualDisplay(a: NodeDisplay, b: NodeDisplay) {
     a.online === b.online &&
     a.cpuPct === b.cpuPct &&
     a.ramUsed === b.ramUsed &&
-    a.ramTotal === b.ramTotal &&
+    a.ramTotal === a.ramTotal &&
     a.ramPct === b.ramPct &&
     a.swapUsed === b.swapUsed &&
     a.swapTotal === b.swapTotal &&
@@ -301,17 +294,17 @@ function commit(next: State, touched: Iterable<string>) {
   }
 }
 
-function applyStreamSnapshot(payload: ReturnType<typeof parseServerStreamPayload>) {
+function applyStreamSnapshot(payload: ReturnType<typeof apiGateway.parseServerStreamPayload>) {
   const nowMs = toTimestamp(payload.now);
   const displays = sortDisplays(
-    payload.servers.map((server) => mapStreamServerToNodeDisplay(server, nowMs)),
+    payload.servers.map((server) => apiGateway.mapStreamServerToNodeDisplay(server, nowMs)),
   );
   const nextByUuid: Record<string, NodeDisplay> = {};
   const nextTrafficTrends: Record<string, NodeTrafficTrend> = {};
   const touched = new Set<string>();
 
   for (const display of displays) {
-    rememberNodeDisplay(display);
+    apiGateway.rememberNodeDisplay(display);
 
     const prev = state.byUuid[display.uuid];
     const merged = prev ? mergeSparseMetadata(prev, display) : display;
@@ -387,81 +380,31 @@ function markConnectionFailure() {
 }
 
 let started = false;
-let socket: WebSocket | null = null;
-let reconnectTimer: number | null = null;
-let reconnectDelayMs = WS_RECONNECT_BASE_DELAY_MS;
 
-function clearReconnectTimer() {
-  if (reconnectTimer != null) {
-    window.clearTimeout(reconnectTimer);
-    reconnectTimer = null;
-  }
-}
-
-function scheduleReconnect() {
-  if (!started || reconnectTimer != null) return;
-  reconnectTimer = window.setTimeout(() => {
-    reconnectTimer = null;
-    openSocket();
-  }, reconnectDelayMs);
-  reconnectDelayMs = Math.min(
-    WS_RECONNECT_MAX_DELAY_MS,
-    Math.round(reconnectDelayMs * 1.6),
-  );
-}
-
-function openSocket() {
-  if (
-    !started ||
-    typeof window === "undefined" ||
-    (socket &&
-      (socket.readyState === WebSocket.OPEN || socket.readyState === WebSocket.CONNECTING))
-  ) {
-    return;
-  }
-
-  clearReconnectTimer();
-
+function handleWsMessage(data: unknown) {
   try {
-    socket = new WebSocket(getServerStreamUrl());
+    const payload = apiGateway.parseServerStreamPayload(data);
+    applyStreamSnapshot(payload);
   } catch {
-    markConnectionFailure();
-    scheduleReconnect();
-    return;
+    // Ignore malformed frames and keep the last successful snapshot.
   }
+}
 
-  socket.onopen = () => {
-    reconnectDelayMs = WS_RECONNECT_BASE_DELAY_MS;
-  };
-
-  socket.onmessage = (event) => {
-    try {
-      const payload = parseServerStreamPayload(JSON.parse(event.data) as unknown);
-      applyStreamSnapshot(payload);
-    } catch {
-      // Ignore malformed frames and keep the last successful snapshot.
-    }
-  };
-
-  socket.onerror = () => {
-    socket?.close();
-  };
-
-  socket.onclose = () => {
-    socket = null;
-    markConnectionFailure();
-    scheduleReconnect();
-  };
+function handleWsClose() {
+  markConnectionFailure();
 }
 
 export function ensureStarted() {
   if (started) return;
   started = true;
-  openSocket();
+
+  apiGateway.wsOnMessage(handleWsMessage);
+  apiGateway.wsOnClose(handleWsClose);
+  apiGateway.wsConnect();
 }
 
 export function hydrateServerSnapshot(
-  payload: ReturnType<typeof parseServerStreamPayload>,
+  payload: ReturnType<typeof apiGateway.parseServerStreamPayload>,
 ) {
   if (state.initialized && state.lastSuccessAt > 0) return;
   applyStreamSnapshot(payload);

@@ -1,3 +1,4 @@
+import { apiGateway } from "./api/gateway";
 import { z } from "zod";
 import {
   LoadRecordSchema,
@@ -40,13 +41,9 @@ const NezhaStateSchema = z
     mem_used: z.number().default(0),
     swap_used: z.number().default(0),
     disk_used: z.number().default(0),
-    /** Cumulative inbound traffic, unit: bytes. */
     net_in_transfer: z.number().default(0),
-    /** Cumulative outbound traffic, unit: bytes. */
     net_out_transfer: z.number().default(0),
-    /** Inbound throughput, unit: bytes per second. */
     net_in_speed: z.number().default(0),
-    /** Outbound throughput, unit: bytes per second. */
     net_out_speed: z.number().default(0),
     uptime: z.number().default(0),
     load_1: z.number().default(0),
@@ -185,7 +182,7 @@ type CachedNodeBase = {
 
 type CachedServiceEntry = {
   expiresAt: number;
-  data: NezhaServiceInfo[];
+  data: z.infer<typeof NezhaServiceInfoSchema>[];
 };
 
 type NezhaServiceInfo = z.infer<typeof NezhaServiceInfoSchema>;
@@ -196,13 +193,6 @@ const SERVICE_CACHE_TTL_MS = 30_000;
 const GUEST_HISTORY_HOURS = 24;
 const ONLINE_GRACE_MS = 65_000;
 
-/**
- * Map Nezha metric keys to the local historical record model.
- *
- * Naming convention reminder:
- * - `net_in` / `net_out` are network throughput, unit: bytes per second
- * - `net_total_down` / `net_total_up` are cumulative traffic totals, unit: bytes
- */
 const LOAD_METRIC_MAP = {
   cpu: "cpu",
   memory: "ram",
@@ -272,10 +262,7 @@ function normalizeExpireValue(value: unknown) {
   return new Date(parsed).toISOString();
 }
 
-function pickStringField(
-  source: Record<string, unknown>,
-  keys: string[],
-): string {
+function pickStringField(source: Record<string, unknown>, keys: string[]): string {
   for (const key of keys) {
     const value = source[key];
     if (typeof value === "string" && value.trim()) {
@@ -299,10 +286,14 @@ function extractExpireInfoFromJson(publicNote: string) {
 
   const root = parsed as Record<string, unknown>;
   const billingData =
-    (root.billingDataMod && typeof root.billingDataMod === "object" && !Array.isArray(root.billingDataMod)
+    (root.billingDataMod &&
+      typeof root.billingDataMod === "object" &&
+      !Array.isArray(root.billingDataMod)
       ? (root.billingDataMod as Record<string, unknown>)
       : null) ??
-    (root.billingData && typeof root.billingData === "object" && !Array.isArray(root.billingData)
+    (root.billingData &&
+      typeof root.billingData === "object" &&
+      !Array.isArray(root.billingData)
       ? (root.billingData as Record<string, unknown>)
       : null);
 
@@ -322,10 +313,7 @@ function extractExpireInfoFromJson(publicNote: string) {
     pickStringField(root, ["remark", "public_remark", "publicRemark", "note", "message", "description"]) ||
     (billingData ? pickStringField(billingData, ["remark", "note", "message", "description"]) : "");
 
-  return {
-    expiredAt,
-    remark,
-  };
+  return { expiredAt, remark };
 }
 
 function extractExpireInfo(publicNote: string) {
@@ -341,7 +329,7 @@ function extractExpireInfo(publicNote: string) {
 
   const patterns = [
     /(?:^|[\s,;|/【】\[\]（）()])(?:到期|过期时间|续费|exp|expire|expiry|expires?\s*at)\s*[:：=]?\s*(\d{4}[./-]\d{1,2}[./-]\d{1,2})(?:$|[\s,;|/【】\[\]（）()])/i,
-    /(?:^|[\s,;|/【】\[\]（）()])(\d{4}[./-]\d{1,2}[./-]\d{1,2})\s*(?:到期|过期|续费|exp|expire|expiry)(?:$|[\s,;|/【】\[\]（）()])/i,
+    /(?:^|[\s,;|/【】\[\]()])(\d{4}[./-]\d{1,2}[./-]\d{1,2})\s*(?:到期|过期|续费|exp|expire|expiry)(?:$|[\s,;|/【】\[\]（）()])/i,
   ];
 
   for (const pattern of patterns) {
@@ -357,16 +345,10 @@ function extractExpireInfo(publicNote: string) {
       .replace(/\s{2,}/g, " ")
       .replace(/^[,;|/，。；、\s]+|[,;|/，。；、\s]+$/g, "");
 
-    return {
-      expiredAt,
-      remark,
-    };
+    return { expiredAt, remark };
   }
 
-  return {
-    expiredAt: "",
-    remark: text,
-  };
+  return { expiredAt: "", remark: text };
 }
 
 function extractCpuCoreCount(cpuModels: string[]) {
@@ -408,38 +390,19 @@ function isOnline(lastActive: string | number | null | undefined, nowMs: number)
 async function apiGet<TSchema extends z.ZodTypeAny>(
   path: string,
   schema: TSchema,
-  options?: {
-    signal?: AbortSignal;
-  },
+  options?: { signal?: AbortSignal },
 ): Promise<z.output<TSchema>> {
-  const resp = await fetch(path, {
-    credentials: "include",
-    headers: { Accept: "application/json" },
-    signal: options?.signal,
-  });
+  try {
+    return await apiGateway.request(path, schema, options);
+  } catch (error) {
+    if (error instanceof ApiRequestError) throw error;
 
-  if (!resp.ok) {
-    throw new ApiRequestError(`Request ${path} failed: ${resp.status}`, resp.status, path);
+    throw new ApiRequestError(
+      error instanceof Error ? error.message : "Unknown error",
+      0,
+      path,
+    );
   }
-
-  const json = (await resp.json()) as unknown;
-  const envelopeResult = ApiEnvelope(schema).safeParse(json);
-  if (envelopeResult.success) {
-    const envelope = envelopeResult.data;
-    if (envelope.success === false) {
-      throw new Error(envelope.error || `Request ${path} failed`);
-    }
-    if (envelope.data !== undefined) {
-      return envelope.data as z.output<TSchema>;
-    }
-  }
-
-  const rawResult = schema.safeParse(json);
-  if (rawResult.success) return rawResult.data;
-
-  throw new Error(
-    `Schema mismatch on ${path}: ${envelopeResult.success ? "empty data" : envelopeResult.error.issues[0]?.message ?? "unknown"}`,
-  );
 }
 
 async function getSettingPayload() {
@@ -458,6 +421,7 @@ async function getServerServices(serverId: number, period: string): Promise<Nezh
     `/api/v1/server/${serverId}/service?period=${period}`,
     z.array(NezhaServiceInfoSchema),
   );
+
   serviceCache.set(cacheKey, {
     expiresAt: now + SERVICE_CACHE_TTL_MS,
     data,
@@ -573,24 +537,14 @@ export function getServerStreamUrl() {
 }
 
 export async function getHomeBootstrap(): Promise<HomeBootstrapPayload> {
-  return await apiGet("/lumina-api/home-bootstrap", HomeBootstrapSchema);
+  return await apiGateway.getHomeBootstrap();
 }
 
 export async function getHomepagePingOverviewBatch(
   uuids: string[],
-  options?: {
-    signal?: AbortSignal;
-  },
+  options?: { signal?: AbortSignal },
 ): Promise<Record<string, PingOverviewItem>> {
-  const normalized = Array.from(new Set(uuids.map((uuid) => uuid.trim()).filter(Boolean))).sort(
-    (left, right) => left.localeCompare(right, undefined, { numeric: true }),
-  );
-
-  if (normalized.length === 0) return {};
-
-  const search = new URLSearchParams();
-  search.set("uuids", normalized.join(","));
-  return await apiGet(`/lumina-api/ping-overview?${search.toString()}`, PingOverviewMapSchema, options);
+  return await apiGateway.getHomepagePingOverviewBatch(uuids, options);
 }
 
 export async function getMe(): Promise<Me> {
@@ -621,10 +575,7 @@ async function getMetricSeries(serverId: number, metric: string, period: string)
   );
 }
 
-async function getAggregatedLoadRecords(
-  uuid: string,
-  hours: number,
-): Promise<LoadRecordsResponse> {
+async function getAggregatedLoadRecords(uuid: string, hours: number): Promise<LoadRecordsResponse> {
   const search = new URLSearchParams();
   search.set("uuid", uuid);
   search.set("hours", String(hours));
@@ -683,7 +634,7 @@ export async function getLoadRecords(
   try {
     return await getAggregatedLoadRecords(uuid, hours);
   } catch {
-    // sidecar 聚合不可用时回退到原有多 metrics 拼装，避免详情页直接失效。
+    // Fallback to multi-metric approach
   }
 
   const serverId = Number.parseInt(uuid, 10);
