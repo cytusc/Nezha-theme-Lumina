@@ -306,27 +306,29 @@ function InstanceStickers({ node }: { node: any }) {
   const isIntel = cpuName.toLowerCase().includes("intel") || cpuLogo?.alt?.includes("Intel");
   const isAmd = cpuName.toLowerCase().includes("amd") || cpuName.toLowerCase().includes("epyc") || cpuName.toLowerCase().includes("ryzen") || cpuLogo?.alt?.includes("AMD");
 
+  const osInfo = parseOsInfo(node.os || "");
+
   return (
     <div className="instance-stickers">
       {cpuLogo && (
         <div
-          className={`instance-sticker ${isIntel ? "is-intel" : isAmd ? "is-amd" : ""}`}
+          className={`instance-sticker is-cpu ${isIntel ? "is-intel" : isAmd ? "is-amd" : ""}`}
           title={cpuLogo.alt}
         >
           <img src={cpuLogo.src} alt={cpuLogo.alt} />
           <div className="sticker-text">
-            <span className="sticker-brand">{isIntel ? "Intel" : isAmd ? "AMD" : ""}</span>
-            <span className="sticker-model">{extractCpuModel(cpuName)}</span>
+            <span className="sticker-brand">{isIntel ? "Intel" : isAmd ? "AMD" : "CPU"}</span>
+            <span className="sticker-model">{extractCpuSeries(cpuName)}</span>
           </div>
           <div className="sticker-shine" />
         </div>
       )}
       {osLogo && (
-        <div className="instance-sticker" title={osLogo.alt}>
+        <div className={`instance-sticker is-os ${osInfo.brandId ? `is-${osInfo.brandId}` : ""}`} title={osLogo.alt}>
           <img src={osLogo.src} alt={osLogo.alt} />
           <div className="sticker-text">
-            <span className="sticker-brand">OS</span>
-            <span className="sticker-model">{osLogo.alt}</span>
+            <span className="sticker-brand">{osInfo.company}</span>
+            <span className="sticker-model">{osInfo.name}</span>
           </div>
           <div className="sticker-shine" />
         </div>
@@ -335,23 +337,66 @@ function InstanceStickers({ node }: { node: any }) {
   );
 }
 
-function extractCpuModel(cpuName: string): string {
-  if (!cpuName) return "";
+function extractCpuSeries(cpuName: string): string {
+  if (!cpuName) return "Processor";
   const name = cpuName.trim();
+
+  // Pattern matching for major series
   const patterns = [
-    /Intel\s+\w+\s+[A-Z]\d+/i,
-    /AMD\s+(EPYC|Ryzen|Threadripper)\s+\S+/i,
-    /Xeon\s+\w*\s*\d*/i,
-    /Core\s+i[3579]/i,
+    { match: /Ryzen\s+\d+/i, out: (m: string) => m },
+    { match: /EPYC/i, out: () => "EPYC" },
+    { match: /Xeon\s+\w+/i, out: (m: string) => m },
+    { match: /Core\s+i[3579]/i, out: (m: string) => m },
+    { match: /Threadripper/i, out: () => "Threadripper" },
+    { match: /Pentium|Celeron/i, out: (m: string) => m },
+    { match: /Apple\s+(M\d+\s+\w+|M\d+)/i, out: (m: string) => m.replace("Apple ", "") },
   ];
-  for (const pattern of patterns) {
-    const match = name.match(pattern);
-    if (match) return match[0];
+
+  for (const p of patterns) {
+    const match = name.match(p.match);
+    if (match) return p.out(match[0]);
   }
-  if (name.length > 25) {
-    return name.substring(0, 22) + "...";
+
+  // Fallback: clean up the name a bit
+  return name.split(" ")[0] || "CPU";
+}
+
+function parseOsInfo(os: string) {
+  const value = os.toLowerCase();
+
+  const brands = [
+    { id: "windows", match: ["windows", "win"], company: "Microsoft", name: "Windows" },
+    { id: "debian", match: ["debian"], company: "Debian", name: "Debian" },
+    { id: "ubuntu", match: ["ubuntu"], company: "Canonical", name: "Ubuntu" },
+    { id: "centos", match: ["centos"], company: "CentOS", name: "CentOS" },
+    { id: "fedora", match: ["fedora"], company: "Fedora Project", name: "Fedora" },
+    { id: "arch", match: ["arch"], company: "Arch Linux", name: "Arch Linux" },
+    { id: "alpine", match: ["alpine"], company: "Alpine", name: "Alpine" },
+    { id: "apple", match: ["macos", "os x", "darwin", "apple"], company: "Apple Inc.", name: "macOS" },
+    { id: "suse", match: ["suse", "opensuse"], company: "SUSE", name: "openSUSE" },
+    { id: "redhat", match: ["redhat", "rhel"], company: "Red Hat", name: "RHEL" },
+  ];
+
+  for (const b of brands) {
+    if (b.match.some(k => value.includes(k))) {
+      // Try to extract version
+      let version = "";
+      const versionMatch = os.match(/\d+(\.\d+)*/);
+      if (versionMatch) version = " " + versionMatch[0];
+
+      return {
+        brandId: b.id,
+        company: b.company,
+        name: b.name + version
+      };
+    }
   }
-  return name;
+
+  return {
+    brandId: null,
+    company: "OS",
+    name: os.split(" ")[0] || "Linux"
+  };
 }
 
 function InfoItem({
