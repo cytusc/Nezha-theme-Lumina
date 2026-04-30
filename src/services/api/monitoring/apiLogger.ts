@@ -9,13 +9,13 @@ class ApiLogger {
   private getLogLevelFromEnv(): LogLevel {
     if (typeof window === "undefined") return "warn";
 
-    const meta = import.meta as unknown as { env?: Record<string, string> | { DEV?: boolean } };
+    const meta = import.meta as unknown as { env?: Record<string, string | boolean> };
     const envLevel = meta.env?.VITE_API_LOG_LEVEL as string | undefined;
     if (envLevel && ["debug", "info", "warn", "error"].includes(envLevel)) {
       return envLevel as LogLevel;
     }
 
-    return (meta.env as { DEV?: boolean })?.DEV ? "debug" : "warn";
+    return meta.env?.DEV ? "debug" : "warn";
   }
 
   private shouldLog(level: LogLevel): boolean {

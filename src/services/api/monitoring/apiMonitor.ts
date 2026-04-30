@@ -216,7 +216,7 @@ class ApiMonitor {
 
     for (const listener of this.updateListeners) {
       try {
-        listener(metrics);
+        listener(path, metrics);
       } catch {
         // 忽略监听器错误
       }
