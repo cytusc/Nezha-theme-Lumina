@@ -139,6 +139,31 @@ npm run build
 npm run package
 ```
 
+
+### 一键免密部署
+
+首次使用先配置 SSH key 登录服务器，保证本机执行下面命令不会要求输入密码：
+
+```bash
+ssh 你的用户@你的服务器
+```
+
+然后复制部署配置模板：
+
+```powershell
+Copy-Item .deploy.env.example .deploy.env
+```
+
+在 `.deploy.env` 中填写 `DEPLOY_HOST`、`DEPLOY_USER`、`DEPLOY_PATH`，如需指定私钥则填写 `DEPLOY_IDENTITY_FILE`。
+
+之后每次只需运行：
+
+```bash
+npm run deploy
+```
+
+脚本会自动执行 `npm run build`，再通过 SSH 将 `dist/` 同步到服务器。脚本使用 `BatchMode=yes`，不会交互式要求输入密码；如果免密登录没配置好，会直接失败并提示先配置 SSH key/ssh-agent。若配置 `DEPLOY_RESTART_COMMAND` 且需要 `sudo`，请在服务器上配置免密 sudo，并使用 `sudo -n ...`。
+
 ## 参考
 
 - [哪吒开发接口文档](https://nezha.wiki/developer/api.html)
