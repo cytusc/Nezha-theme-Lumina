@@ -1,0 +1,59 @@
+worker_processes auto;
+error_log /var/log/nginx/error.log warn;
+pid /run/nginx/nginx.pid;
+
+events {
+    worker_connections 1024;
+}
+
+http {
+    include /etc/nginx/mime.types;
+    default_type application/octet-stream;
+    sendfile on;
+    keepalive_timeout 65;
+    gzip on;
+    gzip_types text/plain text/css application/json application/javascript text/xml image/svg+xml;
+    gzip_min_length 1024;
+
+    server {
+        listen 80;
+        server_name _;
+
+        location /lumina-api/ {
+            proxy_pass http://127.0.0.1:18080;
+            proxy_set_header Host $host;
+            proxy_set_header X-Real-IP $remote_addr;
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        }
+
+        location /api/ {
+            proxy_pass http://${NEZHA_HOST}:${NEZHA_PORT};
+            proxy_set_header Host $host;
+            proxy_set_header Origin $scheme://$host;
+            proxy_set_header X-Real-IP $remote_addr;
+            proxy_set_header nz-realip $remote_addr;
+            proxy_http_version 1.1;
+            proxy_set_header Upgrade $http_upgrade;
+            proxy_set_header Connection "upgrade";
+            proxy_read_timeout 3600s;
+        }
+
+        location /dashboard/ {
+            proxy_pass http://${NEZHA_HOST}:${NEZHA_PORT};
+            proxy_set_header Host $host;
+            proxy_set_header Origin $scheme://$host;
+            proxy_set_header X-Real-IP $remote_addr;
+            proxy_set_header nz-realip $remote_addr;
+        }
+
+        location = /dashboard {
+            return 308 /dashboard/;
+        }
+
+        location / {
+            root /usr/share/nginx/html;
+            index index.html;
+            try_files $uri $uri/ /index.html;
+        }
+    }
+}
