@@ -1,7 +1,7 @@
 #!/bin/bash
 set -e
 
-REPO_RAW="https://raw.githubusercontent.com/cytusc/Nezha-theme-Lumina/main"
+REPO_URL="https://github.com/cytusc/Nezha-theme-Lumina"
 INSTALL_DIR="/opt/lumina"
 ENV_FILE="$INSTALL_DIR/.env"
 COMPOSE_FILE="$INSTALL_DIR/docker-compose.yml"
@@ -37,29 +37,27 @@ else
         NEZHA_PORT="$DETECTED_PORT"
     else
         echo "[-] 未自动探测到哪吒服务"
-        read -p "    请输入哪吒 Dashboard 端口 [默认 8008]: " NEZHA_PORT
-        NEZHA_PORT="${NEZHA_PORT:-8008}"
+        NEZHA_PORT="8008"
+        if [ -t 0 ]; then
+            read -p "    请输入哪吒 Dashboard 端口 [默认 8008]: " INPUT_PORT </dev/tty
+            NEZHA_PORT="${INPUT_PORT:-8008}"
+        fi
     fi
 
     NEZHA_HOST="host.docker.internal"
+    LUMINA_PORT="3000"
 
-    read -p "[?] Lumina 对外端口 [默认 3000]: " LUMINA_PORT
-    LUMINA_PORT="${LUMINA_PORT:-3000}"
-
-    echo ""
-    echo "[*] 哪吒管理员账号（用于拉取完整监控数据，可留空跳过）"
-    read -p "    用户名: " LUMINA_DASHBOARD_USERNAME
-    if [ -n "$LUMINA_DASHBOARD_USERNAME" ]; then
-        read -sp "    密码: " LUMINA_DASHBOARD_PASSWORD
-        echo ""
+    if [ -t 0 ]; then
+        read -p "[?] Lumina 对外端口 [默认 3000]: " INPUT_PORT </dev/tty
+        LUMINA_PORT="${INPUT_PORT:-3000}"
     fi
 
     cat > "$ENV_FILE" <<EOF
 NEZHA_HOST=$NEZHA_HOST
 NEZHA_PORT=$NEZHA_PORT
 LUMINA_PORT=$LUMINA_PORT
-LUMINA_DASHBOARD_USERNAME=${LUMINA_DASHBOARD_USERNAME:-}
-LUMINA_DASHBOARD_PASSWORD=${LUMINA_DASHBOARD_PASSWORD:-}
+LUMINA_DASHBOARD_USERNAME=
+LUMINA_DASHBOARD_PASSWORD=
 EOF
     chmod 600 "$ENV_FILE"
     echo "[+] 配置已保存到 $ENV_FILE"
@@ -83,17 +81,20 @@ EOF
 
 echo ""
 if docker image inspect "$IMAGE_NAME" > /dev/null 2>&1; then
-    echo "[*] 本地已有镜像 $IMAGE_NAME，跳过拉取"
+    echo "[*] 本地已有镜像，跳过拉取"
 else
     echo "[*] 拉取镜像..."
-    docker pull "$IMAGE_NAME" 2>/dev/null || {
-        echo "[*] 远程仓库不可用，从源码构建..."
+    if docker pull "$IMAGE_NAME" 2>/dev/null; then
+        echo "[+] 镜像拉取成功"
+    else
+        echo "[*] 远程镜像不可用，从源码构建（首次约 2-3 分钟）..."
         TMPDIR=$(mktemp -d)
-        curl -fsSL "https://github.com/cytusc/Nezha-theme-Lumina/archive/refs/heads/main.tar.gz" -o "$TMPDIR/source.tar.gz" || { echo "[!] 下载源码失败"; exit 1; }
+        curl -fsSL "$REPO_URL/archive/refs/heads/main.tar.gz" -o "$TMPDIR/source.tar.gz" || { echo "[!] 下载源码失败"; exit 1; }
         tar -xzf "$TMPDIR/source.tar.gz" -C "$TMPDIR" --strip-components=1
         docker build -t "$IMAGE_NAME" "$TMPDIR"
         rm -rf "$TMPDIR"
-    }
+        echo "[+] 镜像构建完成"
+    fi
 fi
 
 echo "[*] 启动容器..."
@@ -103,8 +104,9 @@ docker compose up -d
 echo ""
 echo "=== 部署完成 ==="
 echo ""
-echo "  Lumina 前端:    http://$(hostname -I 2>/dev/null | awk '{print $1}' || echo 'YOUR_IP'):${LUMINA_PORT}"
-echo "  哪吒管理后台:  http://$(hostname -I 2>/dev/null | awk '{print $1}' || echo 'YOUR_IP'):${LUMINA_PORT}/dashboard/"
+SERVER_IP=$(hostname -I 2>/dev/null | awk '{print $1}' || echo 'YOUR_IP')
+echo "  Lumina 前端:    http://${SERVER_IP}:${LUMINA_PORT}"
+echo "  哪吒管理后台:  http://${SERVER_IP}:${LUMINA_PORT}/dashboard/"
 echo ""
 echo "  如有域名，反向代理指向 127.0.0.1:${LUMINA_PORT} 即可"
 echo ""
