@@ -1,0 +1,47 @@
+import { useNodeStoreStatus, useVisibleNodeUuids } from "@/hooks/useNode";
+import { useHomepagePingOverview } from "@/hooks/usePingMini";
+import { NodeCard } from "./NodeCard";
+
+export function NodeGrid() {
+  const uuids = useVisibleNodeUuids();
+  const { initialized } = useNodeStoreStatus();
+  useHomepagePingOverview();
+
+  if (!initialized) {
+    return (
+      <div className="flex h-[40vh] flex-col items-center justify-center gap-2 text-[var(--text-tertiary)]">
+        <span className="text-[15px]">正在加载节点概览</span>
+        <span className="text-[12px]">已启用 REST 首屏兜底，正在同步实时状态</span>
+      </div>
+    );
+  }
+
+  if (uuids.length === 0) {
+    return (
+      <div className="flex h-[40vh] flex-col items-center justify-center gap-2 text-[var(--text-tertiary)]">
+        <span className="text-[15px]">尚未连接到任何节点</span>
+        <span className="text-[12px]">等待后端推送或前往管理后台添加</span>
+      </div>
+    );
+  }
+
+  return (
+    <div className="grid-scroll-container px-4 pb-12">
+      <div 
+        className="grid gap-4 xl:gap-5 mx-auto w-full"
+        style={{ 
+          display: 'grid',
+          gridTemplateColumns: "repeat(auto-fill, minmax(min(100%, 360px), 1fr))" 
+        }}
+      >
+        {uuids.map((uuid) => (
+          <div key={uuid} className="flex justify-center">
+            <div className="w-full max-w-[520px]">
+              <NodeCard uuid={uuid} />
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}

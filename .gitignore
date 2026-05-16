@@ -1,0 +1,49 @@
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+outputs/
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Archives / build artifacts
+*.zip
+*.tar.gz
+
+# IDE / editor
+.idea/
+.vscode/
+.codex
+.trae/
+.claude/
+
+# Environment & secrets
+.deploy.env
+.deploy.env.example
+.env
+.env.*
+*.secret
+
+# Cache & coverage
+.cache/
+coverage/
+
+# Vibe intermediates
+docs/plans/
+docs/requirements/
+
+# Development scripts & tools (deploy, preview generation, packaging)
+scripts/
+
+# Local docs (plans, specs, notes)
+docs/
