@@ -1,3 +1,4 @@
+import { memo } from "react";
 import { lossHeatColor } from "@/utils/metricTone";
 import type { PingOverviewBucket } from "@/types/monitor";
 
@@ -10,7 +11,7 @@ interface QualityBarsProps {
   onHoverIndex?: (index: number | null) => void;
 }
 
-export function QualityBars({
+export const QualityBars = memo(function QualityBars({
   value,
   count,
   buckets,
@@ -63,4 +64,4 @@ export function QualityBars({
       })}
     </div>
   );
-}
+});

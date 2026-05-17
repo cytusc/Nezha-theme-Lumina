@@ -274,18 +274,32 @@ export function useResponsiveChartSize(
     }
 
     update();
-    window.addEventListener("resize", update);
+
+    let rafId = 0;
+    function throttledUpdate() {
+      if (rafId) return;
+      rafId = requestAnimationFrame(() => {
+        rafId = 0;
+        update();
+      });
+    }
+
+    window.addEventListener("resize", throttledUpdate);
 
     if (containerRef?.current && typeof ResizeObserver !== "undefined") {
-      const observer = new ResizeObserver(() => update());
+      const observer = new ResizeObserver(() => throttledUpdate());
       observer.observe(containerRef.current);
       return () => {
         observer.disconnect();
-        window.removeEventListener("resize", update);
+        window.removeEventListener("resize", throttledUpdate);
+        if (rafId) cancelAnimationFrame(rafId);
       };
     }
 
-    return () => window.removeEventListener("resize", update);
+    return () => {
+      window.removeEventListener("resize", throttledUpdate);
+      if (rafId) cancelAnimationFrame(rafId);
+    };
   }, [containerRef, mode]);
 
   return size;

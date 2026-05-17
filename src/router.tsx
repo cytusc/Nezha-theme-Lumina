@@ -2,8 +2,8 @@ import { createBrowserRouter, Navigate } from "react-router-dom";
 import { lazy, Suspense } from "react";
 import { AppShell } from "@/components/shell/AppShell";
 import { Spinner } from "@/components/ui/Spinner";
+import { Home } from "@/pages/Home";
 
-const Home = lazy(() => import("@/pages/Home").then((m) => ({ default: m.Home })));
 const Instance = lazy(() =>
   import("@/pages/Instance").then((m) => ({ default: m.Instance })),
 );
@@ -26,11 +26,7 @@ export const router = createBrowserRouter([
     children: [
       {
         index: true,
-        element: (
-          <Suspense fallback={<Loading />}>
-            <Home />
-          </Suspense>
-        ),
+        element: <Home />,
       },
       {
         path: "instance/:uuid",

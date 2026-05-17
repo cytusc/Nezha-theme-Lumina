@@ -19,18 +19,7 @@ import {
 } from "./wsShared";
 
 let wsWorker: Worker | null = null;
-let useWorker = false;
-
-try {
-  const testWorker = new Worker(
-    new URL("./wsWorker.ts", import.meta.url),
-    { type: "module" },
-  );
-  testWorker.terminate();
-  useWorker = true;
-} catch {
-  useWorker = false;
-}
+let useWorker = typeof Worker !== "undefined";
 
 type Listener = () => void;
 

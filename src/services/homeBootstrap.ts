@@ -1,4 +1,4 @@
-import { getHomeBootstrap, getHomeSnapshot } from "@/services/api";
+import { getHomeBootstrap } from "@/services/api";
 import { seedPingOverview } from "@/services/pingOverviewStore";
 import { hydrateServerSnapshot } from "@/services/wsStore";
 import {
@@ -63,22 +63,7 @@ async function writeCachedBootstrap(payload: Awaited<ReturnType<typeof getHomeBo
   ]);
 }
 
-async function tryFetchSnapshotFirst(): Promise<boolean> {
-  try {
-    const data = await getHomeSnapshot();
-    if (data) {
-      hydrateSnapshotOnly(data);
-      return true;
-    }
-  } catch {
-    // 轻量快照接口不可用，回退到完整 bootstrap
-  }
-  return false;
-}
-
 export function ensureHomeBootstrap() {
-  let cachedSync: Awaited<ReturnType<typeof getHomeBootstrap>> | null = null;
-
   if (!bootstrapCacheHydrated && typeof window !== "undefined") {
     bootstrapCacheHydrated = true;
   }
@@ -89,19 +74,25 @@ export function ensureHomeBootstrap() {
 
   bootstrapAttempted = true;
   bootstrapPromise = (async () => {
-    cachedSync = await readCachedBootstrap();
-    if (cachedSync) {
-      hydrateFromBootstrapPayload(cachedSync);
-    } else {
-      await tryFetchSnapshotFirst();
+    const [cached, payload] = await Promise.all([
+      readCachedBootstrap(),
+      getHomeBootstrap().catch(() => null),
+    ]);
+
+    if (cached && !payload) {
+      hydrateFromBootstrapPayload(cached);
+      return;
     }
 
-    const payload = await getHomeBootstrap();
-    hydrateFromBootstrapPayload(payload);
-    await writeCachedBootstrap(payload);
-  })().catch(() => {
-    // 静默失败，继续依赖 WebSocket 首帧恢复页面。
-  });
+    if (cached) {
+      hydrateFromBootstrapPayload(cached);
+    }
+
+    if (payload) {
+      hydrateFromBootstrapPayload(payload);
+      writeCachedBootstrap(payload).catch(() => {});
+    }
+  })().catch(() => {});
 
   return bootstrapPromise;
 }

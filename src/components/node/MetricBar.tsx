@@ -1,3 +1,4 @@
+import { memo } from "react";
 import type { ReactNode } from "react";
 
 const METRIC_SEGMENT_COUNT = 14;
@@ -16,7 +17,7 @@ interface MetricBarProps {
   secondaryFill?: string;
 }
 
-export function MetricBar({
+export const MetricBar = memo(function MetricBar({
   icon,
   label,
   valueText,
@@ -103,4 +104,4 @@ export function MetricBar({
       </div>
     </div>
   );
-}
+});

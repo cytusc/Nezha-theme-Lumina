@@ -1,3 +1,4 @@
+import { memo } from "react";
 import { latencyHeatColor } from "@/utils/metricTone";
 import type { PingOverviewBucket } from "@/types/monitor";
 
@@ -26,7 +27,7 @@ function percentile(values: number[], ratio: number) {
 }
 
 /** Pixel-matched latency histogram (24 bars, 8px tall, 1px gap). */
-export function MiniBars({
+export const MiniBars = memo(function MiniBars({
   values,
   max,
   lastValue,
@@ -144,4 +145,4 @@ export function MiniBars({
       })}
     </div>
   );
-}
+});
