@@ -12,6 +12,26 @@ export function AppShell() {
           <Outlet />
         </div>
       </main>
+      <footer className="py-4 text-center text-xs text-[var(--text-tertiary)] opacity-60">
+        Powered by{" "}
+        <a
+          href="https://github.com/nezhahq/nezha"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="underline decoration-dotted underline-offset-2 hover:opacity-80"
+        >
+          Nezha
+        </a>
+        {" "}&{" "}
+        <a
+          href="https://github.com/stqfdyr/komari-theme-Lumina"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="underline decoration-dotted underline-offset-2 hover:opacity-80"
+        >
+          Lumina
+        </a>
+      </footer>
     </div>
   );
 }
