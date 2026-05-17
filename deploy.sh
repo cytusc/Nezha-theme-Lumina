@@ -2,7 +2,7 @@
 set -e
 
 REPO_URL="https://github.com/cytusc/Nezha-theme-Lumina"
-INSTALL_DIR="/opt/lumina"
+INSTALL_DIR="/opt/nezha/lumina"
 ENV_FILE="$INSTALL_DIR/.env"
 COMPOSE_FILE="$INSTALL_DIR/docker-compose.yml"
 IMAGE_NAME="ghcr.io/cytusc/lumina-theme:latest"

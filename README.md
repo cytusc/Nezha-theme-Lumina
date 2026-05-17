@@ -36,7 +36,7 @@ curl -fsSL https://raw.githubusercontent.com/cytusc/Nezha-theme-Lumina/main/depl
 
 ## 配置
 
-部署后配置文件位于 `/opt/lumina/.env`：
+部署后配置文件位于 `/opt/nezha/lumina/.env`：
 
 | 变量 | 默认值 | 说明 |
 |------|--------|------|
@@ -45,7 +45,7 @@ curl -fsSL https://raw.githubusercontent.com/cytusc/Nezha-theme-Lumina/main/depl
 | `LUMINA_DASHBOARD_USERNAME` | 空 | 哪吒管理员用户名（可选） |
 | `LUMINA_DASHBOARD_PASSWORD` | 空 | 哪吒管理员密码（可选） |
 
-修改后执行 `cd /opt/lumina && docker compose up -d` 生效。
+修改后执行 `cd /opt/nezha/lumina && docker compose up -d` 生效。
 
 ## 反向代理（可选）
 
@@ -66,7 +66,7 @@ your.domain {
 ## 管理命令
 
 ```bash
-cd /opt/lumina
+cd /opt/nezha/lumina
 docker compose up -d        # 启动
 docker compose down         # 停止
 docker compose pull && docker compose up -d  # 更新
