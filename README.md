@@ -6,9 +6,9 @@ Lumina 是面向 [哪吒监控（Nezha）](https://github.com/nezhahq/nezha) 的
 
 ## 截图
 
-| 白日模式 | 夜间模式 |
-|:---:|:---:|
-| ![Light](https://cdn.nodeimage.com/i/nL9GD3QcqtLla7kWrqaAXj8Xfg0f9pPA.webp) | ![Dark](https://cdn.nodeimage.com/i/pCDfjaqYE9gYxP0VJeAnX1zdFugqDiLD.webp) |
+| 白日模式 | 夜间模式 | 详情页 |
+|:---:|:---:|:---:|
+| ![image](https://i.111666.best/image/XLVg1eHGTpXH3F6AtiCTNk.png) | ![image](https://i.111666.best/image/CmzVpVfLl5Xc0Wo4JyuRds.png) | ![image](https://i.111666.best/image/IfDrLS5Xjzbir0EDpczRxm.png) |
 
 ## 特性
 
